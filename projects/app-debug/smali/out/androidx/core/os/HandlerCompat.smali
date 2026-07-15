@@ -1,0 +1,568 @@
+.class public final Landroidx/core/os/HandlerCompat;
+.super Ljava/lang/Object;
+.source "HandlerCompat.java"
+
+
+# annotations
+.annotation system Ldalvik/annotation/MemberClasses;
+    value = {
+        Landroidx/core/os/HandlerCompat$Api28Impl;,
+        Landroidx/core/os/HandlerCompat$Api29Impl;
+    }
+.end annotation
+
+
+# static fields
+.field private static final TAG:Ljava/lang/String; = "HandlerCompat"
+
+
+# direct methods
+.method private constructor <init>()V
+    .registers 1
+
+    .line 244
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    .line 246
+    return-void
+.end method
+
+.method public static createAsync(Landroid/os/Looper;)Landroid/os/Handler;
+    .registers 6
+    .param p0, "looper"    # Landroid/os/Looper;
+
+    .line 64
+    sget v0, Landroid/os/Build$VERSION;->SDK_INT:I
+
+    const/16 v1, 0x1c
+
+    if-lt v0, v1, :cond_b
+
+    .line 65
+    invoke-static {p0}, Landroidx/core/os/HandlerCompat$Api28Impl;->createAsync(Landroid/os/Looper;)Landroid/os/Handler;
+
+    move-result-object v0
+
+    return-object v0
+
+    .line 70
+    :cond_b
+    :try_start_b
+    const-class v0, Landroid/os/Handler;
+
+    const/4 v1, 0x3
+
+    new-array v1, v1, [Ljava/lang/Class;
+
+    const-class v2, Landroid/os/Looper;
+
+    const/4 v3, 0x0
+
+    aput-object v2, v1, v3
+
+    const-class v2, Landroid/os/Handler$Callback;
+
+    const/4 v3, 0x1
+
+    aput-object v2, v1, v3
+
+    sget-object v2, Ljava/lang/Boolean;->TYPE:Ljava/lang/Class;
+
+    const/4 v4, 0x2
+
+    aput-object v2, v1, v4
+
+    invoke-virtual {v0, v1}, Ljava/lang/Class;->getDeclaredConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;
+
+    move-result-object v0
+
+    .line 72
+    invoke-static {v3}, Ljava/lang/Boolean;->valueOf(Z)Ljava/lang/Boolean;
+
+    move-result-object v1
+
+    const/4 v2, 0x0
+
+    filled-new-array {p0, v2, v1}, [Ljava/lang/Object;
+
+    move-result-object v1
+
+    invoke-virtual {v0, v1}, Ljava/lang/reflect/Constructor;->newInstance([Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Landroid/os/Handler;
+    :try_end_32
+    .catch Ljava/lang/IllegalAccessException; {:try_start_b .. :try_end_32} :catch_54
+    .catch Ljava/lang/InstantiationException; {:try_start_b .. :try_end_32} :catch_51
+    .catch Ljava/lang/NoSuchMethodException; {:try_start_b .. :try_end_32} :catch_4e
+    .catch Ljava/lang/reflect/InvocationTargetException; {:try_start_b .. :try_end_32} :catch_33
+
+    .line 70
+    return-object v0
+
+    .line 79
+    :catch_33
+    move-exception v0
+
+    .line 80
+    .local v0, "e":Ljava/lang/reflect/InvocationTargetException;
+    invoke-virtual {v0}, Ljava/lang/reflect/InvocationTargetException;->getCause()Ljava/lang/Throwable;
+
+    move-result-object v1
+
+    .line 81
+    .local v1, "cause":Ljava/lang/Throwable;
+    instance-of v2, v1, Ljava/lang/RuntimeException;
+
+    if-nez v2, :cond_4a
+
+    .line 84
+    instance-of v2, v1, Ljava/lang/Error;
+
+    if-eqz v2, :cond_44
+
+    .line 85
+    move-object v2, v1
+
+    check-cast v2, Ljava/lang/Error;
+
+    throw v2
+
+    .line 87
+    :cond_44
+    new-instance v2, Ljava/lang/RuntimeException;
+
+    invoke-direct {v2, v1}, Ljava/lang/RuntimeException;-><init>(Ljava/lang/Throwable;)V
+
+    throw v2
+
+    .line 82
+    :cond_4a
+    move-object v2, v1
+
+    check-cast v2, Ljava/lang/RuntimeException;
+
+    throw v2
+
+    .line 77
+    .end local v0    # "e":Ljava/lang/reflect/InvocationTargetException;
+    .end local v1    # "cause":Ljava/lang/Throwable;
+    :catch_4e
+    move-exception v0
+
+    .line 78
+    .local v0, "e":Ljava/lang/NoSuchMethodException;
+    nop
+
+    .local v0, "wrappedException":Ljava/lang/Exception;
+    goto :goto_56
+
+    .line 75
+    .end local v0    # "wrappedException":Ljava/lang/Exception;
+    :catch_51
+    move-exception v0
+
+    .line 76
+    .local v0, "e":Ljava/lang/InstantiationException;
+    nop
+
+    .local v0, "wrappedException":Ljava/lang/Exception;
+    goto :goto_56
+
+    .line 73
+    .end local v0    # "wrappedException":Ljava/lang/Exception;
+    :catch_54
+    move-exception v0
+
+    .line 74
+    .local v0, "e":Ljava/lang/IllegalAccessException;
+    nop
+
+    .line 88
+    .local v0, "wrappedException":Ljava/lang/Exception;
+    :goto_56
+    nop
+
+    .line 91
+    const-string v1, "HandlerCompat"
+
+    const-string v2, "Unable to invoke Handler(Looper, Callback, boolean) constructor"
+
+    invoke-static {v1, v2, v0}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
+
+    .line 94
+    new-instance v1, Landroid/os/Handler;
+
+    invoke-direct {v1, p0}, Landroid/os/Handler;-><init>(Landroid/os/Looper;)V
+
+    return-object v1
+.end method
+
+.method public static createAsync(Landroid/os/Looper;Landroid/os/Handler$Callback;)Landroid/os/Handler;
+    .registers 7
+    .param p0, "looper"    # Landroid/os/Looper;
+    .param p1, "callback"    # Landroid/os/Handler$Callback;
+
+    .line 123
+    sget v0, Landroid/os/Build$VERSION;->SDK_INT:I
+
+    const/16 v1, 0x1c
+
+    if-lt v0, v1, :cond_b
+
+    .line 124
+    invoke-static {p0, p1}, Landroidx/core/os/HandlerCompat$Api28Impl;->createAsync(Landroid/os/Looper;Landroid/os/Handler$Callback;)Landroid/os/Handler;
+
+    move-result-object v0
+
+    return-object v0
+
+    .line 129
+    :cond_b
+    :try_start_b
+    const-class v0, Landroid/os/Handler;
+
+    const/4 v1, 0x3
+
+    new-array v1, v1, [Ljava/lang/Class;
+
+    const-class v2, Landroid/os/Looper;
+
+    const/4 v3, 0x0
+
+    aput-object v2, v1, v3
+
+    const-class v2, Landroid/os/Handler$Callback;
+
+    const/4 v3, 0x1
+
+    aput-object v2, v1, v3
+
+    sget-object v2, Ljava/lang/Boolean;->TYPE:Ljava/lang/Class;
+
+    const/4 v4, 0x2
+
+    aput-object v2, v1, v4
+
+    invoke-virtual {v0, v1}, Ljava/lang/Class;->getDeclaredConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;
+
+    move-result-object v0
+
+    .line 131
+    invoke-static {v3}, Ljava/lang/Boolean;->valueOf(Z)Ljava/lang/Boolean;
+
+    move-result-object v1
+
+    filled-new-array {p0, p1, v1}, [Ljava/lang/Object;
+
+    move-result-object v1
+
+    invoke-virtual {v0, v1}, Ljava/lang/reflect/Constructor;->newInstance([Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Landroid/os/Handler;
+    :try_end_31
+    .catch Ljava/lang/IllegalAccessException; {:try_start_b .. :try_end_31} :catch_53
+    .catch Ljava/lang/InstantiationException; {:try_start_b .. :try_end_31} :catch_50
+    .catch Ljava/lang/NoSuchMethodException; {:try_start_b .. :try_end_31} :catch_4d
+    .catch Ljava/lang/reflect/InvocationTargetException; {:try_start_b .. :try_end_31} :catch_32
+
+    .line 129
+    return-object v0
+
+    .line 138
+    :catch_32
+    move-exception v0
+
+    .line 139
+    .local v0, "e":Ljava/lang/reflect/InvocationTargetException;
+    invoke-virtual {v0}, Ljava/lang/reflect/InvocationTargetException;->getCause()Ljava/lang/Throwable;
+
+    move-result-object v1
+
+    .line 140
+    .local v1, "cause":Ljava/lang/Throwable;
+    instance-of v2, v1, Ljava/lang/RuntimeException;
+
+    if-nez v2, :cond_49
+
+    .line 143
+    instance-of v2, v1, Ljava/lang/Error;
+
+    if-eqz v2, :cond_43
+
+    .line 144
+    move-object v2, v1
+
+    check-cast v2, Ljava/lang/Error;
+
+    throw v2
+
+    .line 146
+    :cond_43
+    new-instance v2, Ljava/lang/RuntimeException;
+
+    invoke-direct {v2, v1}, Ljava/lang/RuntimeException;-><init>(Ljava/lang/Throwable;)V
+
+    throw v2
+
+    .line 141
+    :cond_49
+    move-object v2, v1
+
+    check-cast v2, Ljava/lang/RuntimeException;
+
+    throw v2
+
+    .line 136
+    .end local v0    # "e":Ljava/lang/reflect/InvocationTargetException;
+    .end local v1    # "cause":Ljava/lang/Throwable;
+    :catch_4d
+    move-exception v0
+
+    .line 137
+    .local v0, "e":Ljava/lang/NoSuchMethodException;
+    nop
+
+    .local v0, "wrappedException":Ljava/lang/Exception;
+    goto :goto_55
+
+    .line 134
+    .end local v0    # "wrappedException":Ljava/lang/Exception;
+    :catch_50
+    move-exception v0
+
+    .line 135
+    .local v0, "e":Ljava/lang/InstantiationException;
+    nop
+
+    .local v0, "wrappedException":Ljava/lang/Exception;
+    goto :goto_55
+
+    .line 132
+    .end local v0    # "wrappedException":Ljava/lang/Exception;
+    :catch_53
+    move-exception v0
+
+    .line 133
+    .local v0, "e":Ljava/lang/IllegalAccessException;
+    nop
+
+    .line 147
+    .local v0, "wrappedException":Ljava/lang/Exception;
+    :goto_55
+    nop
+
+    .line 150
+    const-string v1, "HandlerCompat"
+
+    const-string v2, "Unable to invoke Handler(Looper, Callback, boolean) constructor"
+
+    invoke-static {v1, v2, v0}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
+
+    .line 153
+    new-instance v1, Landroid/os/Handler;
+
+    invoke-direct {v1, p0, p1}, Landroid/os/Handler;-><init>(Landroid/os/Looper;Landroid/os/Handler$Callback;)V
+
+    return-object v1
+.end method
+
+.method public static hasCallbacks(Landroid/os/Handler;Ljava/lang/Runnable;)Z
+    .registers 8
+    .param p0, "handler"    # Landroid/os/Handler;
+    .param p1, "r"    # Ljava/lang/Runnable;
+
+    .line 210
+    const/4 v0, 0x0
+
+    .line 212
+    .local v0, "wrappedException":Ljava/lang/Exception;
+    sget v1, Landroid/os/Build$VERSION;->SDK_INT:I
+
+    const/16 v2, 0x1d
+
+    if-lt v1, v2, :cond_c
+
+    .line 213
+    invoke-static {p0, p1}, Landroidx/core/os/HandlerCompat$Api29Impl;->hasCallbacks(Landroid/os/Handler;Ljava/lang/Runnable;)Z
+
+    move-result v1
+
+    return v1
+
+    .line 219
+    :cond_c
+    :try_start_c
+    const-class v1, Landroid/os/Handler;
+
+    const-string v2, "hasCallbacks"
+
+    const/4 v3, 0x1
+
+    new-array v3, v3, [Ljava/lang/Class;
+
+    const-class v4, Ljava/lang/Runnable;
+
+    const/4 v5, 0x0
+
+    aput-object v4, v3, v5
+
+    invoke-virtual {v1, v2, v3}, Ljava/lang/Class;->getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
+
+    move-result-object v1
+
+    .line 221
+    .local v1, "hasCallbacksMethod":Ljava/lang/reflect/Method;
+    filled-new-array {p1}, [Ljava/lang/Object;
+
+    move-result-object v2
+
+    invoke-virtual {v1, p0, v2}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object v2
+
+    check-cast v2, Ljava/lang/Boolean;
+
+    invoke-virtual {v2}, Ljava/lang/Boolean;->booleanValue()Z
+
+    move-result v2
+    :try_end_2a
+    .catch Ljava/lang/reflect/InvocationTargetException; {:try_start_c .. :try_end_2a} :catch_3c
+    .catch Ljava/lang/IllegalAccessException; {:try_start_c .. :try_end_2a} :catch_31
+    .catch Ljava/lang/NoSuchMethodException; {:try_start_c .. :try_end_2a} :catch_2e
+    .catch Ljava/lang/NullPointerException; {:try_start_c .. :try_end_2a} :catch_2b
+
+    return v2
+
+    .line 235
+    .end local v1    # "hasCallbacksMethod":Ljava/lang/reflect/Method;
+    :catch_2b
+    move-exception v1
+
+    .line 236
+    .local v1, "e":Ljava/lang/NullPointerException;
+    move-object v0, v1
+
+    goto :goto_34
+
+    .line 233
+    .end local v1    # "e":Ljava/lang/NullPointerException;
+    :catch_2e
+    move-exception v1
+
+    .line 234
+    .local v1, "e":Ljava/lang/NoSuchMethodException;
+    move-object v0, v1
+
+    .end local v1    # "e":Ljava/lang/NoSuchMethodException;
+    goto :goto_33
+
+    .line 231
+    :catch_31
+    move-exception v1
+
+    .line 232
+    .local v1, "e":Ljava/lang/IllegalAccessException;
+    move-object v0, v1
+
+    .line 237
+    .end local v1    # "e":Ljava/lang/IllegalAccessException;
+    :goto_33
+    nop
+
+    .line 240
+    :goto_34
+    new-instance v1, Ljava/lang/UnsupportedOperationException;
+
+    const-string v2, "Failed to call Handler.hasCallbacks(), but there is no safe failure mode for this method. Raising exception."
+
+    invoke-direct {v1, v2, v0}, Ljava/lang/UnsupportedOperationException;-><init>(Ljava/lang/String;Ljava/lang/Throwable;)V
+
+    throw v1
+
+    .line 222
+    :catch_3c
+    move-exception v1
+
+    .line 223
+    .local v1, "e":Ljava/lang/reflect/InvocationTargetException;
+    invoke-virtual {v1}, Ljava/lang/reflect/InvocationTargetException;->getCause()Ljava/lang/Throwable;
+
+    move-result-object v2
+
+    .line 224
+    .local v2, "cause":Ljava/lang/Throwable;
+    instance-of v3, v2, Ljava/lang/RuntimeException;
+
+    if-nez v3, :cond_53
+
+    .line 227
+    instance-of v3, v2, Ljava/lang/Error;
+
+    if-eqz v3, :cond_4d
+
+    .line 228
+    move-object v3, v2
+
+    check-cast v3, Ljava/lang/Error;
+
+    throw v3
+
+    .line 230
+    :cond_4d
+    new-instance v3, Ljava/lang/RuntimeException;
+
+    invoke-direct {v3, v2}, Ljava/lang/RuntimeException;-><init>(Ljava/lang/Throwable;)V
+
+    throw v3
+
+    .line 225
+    :cond_53
+    move-object v3, v2
+
+    check-cast v3, Ljava/lang/RuntimeException;
+
+    throw v3
+.end method
+
+.method public static postDelayed(Landroid/os/Handler;Ljava/lang/Runnable;Ljava/lang/Object;J)Z
+    .registers 7
+    .param p0, "handler"    # Landroid/os/Handler;
+    .param p1, "r"    # Ljava/lang/Runnable;
+    .param p2, "token"    # Ljava/lang/Object;
+    .param p3, "delayMillis"    # J
+
+    .line 182
+    sget v0, Landroid/os/Build$VERSION;->SDK_INT:I
+
+    const/16 v1, 0x1c
+
+    if-lt v0, v1, :cond_b
+
+    .line 183
+    invoke-static {p0, p1, p2, p3, p4}, Landroidx/core/os/HandlerCompat$Api28Impl;->postDelayed(Landroid/os/Handler;Ljava/lang/Runnable;Ljava/lang/Object;J)Z
+
+    move-result v0
+
+    return v0
+
+    .line 186
+    :cond_b
+    invoke-static {p0, p1}, Landroid/os/Message;->obtain(Landroid/os/Handler;Ljava/lang/Runnable;)Landroid/os/Message;
+
+    move-result-object v0
+
+    .line 187
+    .local v0, "message":Landroid/os/Message;
+    iput-object p2, v0, Landroid/os/Message;->obj:Ljava/lang/Object;
+
+    .line 188
+    invoke-virtual {p0, v0, p3, p4}, Landroid/os/Handler;->sendMessageDelayed(Landroid/os/Message;J)Z
+
+    move-result v1
+
+    return v1
+.end method
