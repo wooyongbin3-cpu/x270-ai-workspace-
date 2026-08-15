@@ -84,11 +84,24 @@ def derive_keys(puzzle_final_hash: bytes) -> "tuple[bytes, bytes]":
     Returns:
         A ``(encryption_key, integrity_key)`` tuple, each 32 bytes.
     """
-    # TODO(TICKET-003): implement via HKDF from cryptography.hazmat.
-    #   - info = _KEY_CONTEXT + b":enc"  for the encryption key
-    #   - info = _KEY_CONTEXT + b":mac"  for the integrity key
-    #   - length = KEY_LENGTH for both
-    raise NotImplementedError
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from cryptography.hazmat.primitives import hashes
+
+    enc_key = HKDF(
+        algorithm=hashes.SHA256(),
+        length=KEY_LENGTH,
+        salt=None,
+        info=_KEY_CONTEXT + b":enc",
+    ).derive(puzzle_final_hash)
+
+    mac_key = HKDF(
+        algorithm=hashes.SHA256(),
+        length=KEY_LENGTH,
+        salt=None,
+        info=_KEY_CONTEXT + b":mac",
+    ).derive(puzzle_final_hash)
+
+    return enc_key, mac_key
 
 
 def encrypt(plaintext: str, puzzle_final_hash: bytes) -> EncryptedSecret:
@@ -106,13 +119,31 @@ def encrypt(plaintext: str, puzzle_final_hash: bytes) -> EncryptedSecret:
     Raises:
         InvalidSecretError: If the plaintext is empty or too large.
     """
-    # TODO(TICKET-003): implement —
-    #   1. validate size, encode to UTF-8
-    #   2. derive (enc_key, mac_key) via derive_keys
-    #   3. AESGCM(enc_key).encrypt(nonce=os.urandom(NONCE_LENGTH), data=payload, aad=b"")
-    #   4. hmac = HMAC-SHA256(mac_key, nonce + ciphertext + tag)
-    #   5. return EncryptedSecret(...)
-    raise NotImplementedError
+    from chronolock.errors import InvalidSecretError
+
+    payload = plaintext.encode("utf-8")
+    if not payload:
+        raise InvalidSecretError("secret must not be empty")
+    if len(payload) > MAX_SECRET_BYTES:
+        raise InvalidSecretError("secret exceeds maximum size")
+
+    enc_key, mac_key = derive_keys(puzzle_final_hash)
+    nonce = os.urandom(NONCE_LENGTH)
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    aesgcm = AESGCM(enc_key)
+    ciphertext = aesgcm.encrypt(nonce, payload, None)
+
+    hmac_digest = compute_hmac(mac_key, nonce + ciphertext)
+    tag = ciphertext[-TAG_LENGTH:]
+    actual_ciphertext = ciphertext[:-TAG_LENGTH]
+
+    return EncryptedSecret(
+        ciphertext=actual_ciphertext,
+        nonce=nonce,
+        tag=tag,
+        hmac=hmac_digest,
+    )
 
 
 def decrypt(encrypted: EncryptedSecret, puzzle_final_hash: bytes) -> str:
@@ -132,13 +163,20 @@ def decrypt(encrypted: EncryptedSecret, puzzle_final_hash: bytes) -> str:
         IntegrityError: If the HMAC does not verify (tampering/corruption).
         cryptography.exceptions.InvalidTag: If GCM authentication fails.
     """
-    # TODO(TICKET-003): implement —
-    #   1. derive (enc_key, mac_key)
-    #   2. recompute HMAC over nonce + ciphertext + tag; raise IntegrityError on mismatch
-    #      (use a constant-time comparison!)
-    #   3. AESGCM(enc_key).decrypt(nonce, ciphertext + tag, aad=b"")
-    #   4. decode UTF-8 and return
-    raise NotImplementedError
+    import hmac as hmac_mod
+    from cryptography.exceptions import InvalidTag
+    from chronolock.errors import IntegrityError
+
+    enc_key, mac_key = derive_keys(puzzle_final_hash)
+
+    expected_hmac = compute_hmac(mac_key, encrypted.nonce + encrypted.ciphertext + encrypted.tag)
+    if not hmac_mod.compare_digest(expected_hmac, encrypted.hmac):
+        raise IntegrityError("integrity check failed: ciphertext or nonce was tampered with")
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    aesgcm = AESGCM(enc_key)
+    plaintext_bytes = aesgcm.decrypt(encrypted.nonce, encrypted.ciphertext + encrypted.tag, None)
+    return plaintext_bytes.decode("utf-8")
 
 
 def compute_hmac(key: bytes, data: bytes) -> bytes:
@@ -154,8 +192,9 @@ def compute_hmac(key: bytes, data: bytes) -> bytes:
     Returns:
         The 32-byte HMAC digest.
     """
-    # TODO(TICKET-003): implement via hmac.new(key, data, hashlib.sha256).
-    raise NotImplementedError
+    import hashlib
+    import hmac as hmac_mod
+    return hmac_mod.new(key, data, hashlib.sha256).digest()
 
 
 def secure_wipe(data: bytearray) -> None:
@@ -169,5 +208,5 @@ def secure_wipe(data: bytearray) -> None:
     Args:
         data: Mutable bytearray whose contents should be zeroed.
     """
-    # TODO(TICKET-003): implement — fill with zeros, then reallocate to size 0.
-    raise NotImplementedError
+    data[:] = bytearray(len(data))
+    del data[:]

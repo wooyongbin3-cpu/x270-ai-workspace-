@@ -35,8 +35,11 @@ Design requirements (see SPEC.md §4):
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from typing import Callable, Optional
+
+from chronolock.errors import PuzzleError
 
 #: The canonical solver version string. Stored in every vault header so we
 #: can refuse to open vaults produced by a solver we no longer understand.
@@ -100,8 +103,8 @@ def generate_seed(entropy_source: Optional[Callable[[int], bytes]] = None) -> by
     Returns:
         A 32-byte seed.
     """
-    # TODO(TICKET-002): implement — return 32 bytes from the entropy source.
-    raise NotImplementedError
+    source = entropy_source or os.urandom
+    return source(32)
 
 
 def validate_difficulty(difficulty: int) -> None:
@@ -111,8 +114,10 @@ def validate_difficulty(difficulty: int) -> None:
         PuzzleError: If ``difficulty`` is not an integer within
             ``[MIN_DIFFICULTY, MAX_DIFFICULTY]``.
     """
-    # TODO(TICKET-002): implement — bounds-check and raise PuzzleError.
-    raise NotImplementedError
+    if not isinstance(difficulty, int) or isinstance(difficulty, bool):
+        raise PuzzleError(f"difficulty must be an integer, got {type(difficulty).__name__}")
+    if difficulty < MIN_DIFFICULTY or difficulty > MAX_DIFFICULTY:
+        raise PuzzleError(f"difficulty {difficulty} out of range [{MIN_DIFFICULTY}, {MAX_DIFFICULTY}]")
 
 
 def solve(spec: PuzzleSpec, progress: Optional[ProgressCallback] = None) -> PuzzleSolution:
@@ -137,10 +142,20 @@ def solve(spec: PuzzleSpec, progress: Optional[ProgressCallback] = None) -> Puzz
         PuzzleError: If the spec's difficulty is invalid or the version is
             unsupported.
     """
-    # TODO(TICKET-002): implement — validate, then loop difficulty times:
-    #   h = SHA256(seed); for _ in range(difficulty): h = SHA256(h)
-    #   calling progress periodically.
-    raise NotImplementedError
+    if spec.version != SOLVER_VERSION:
+        raise PuzzleError(f"unsupported solver version: {spec.version!r}")
+    validate_difficulty(spec.difficulty)
+
+    h = hashlib.sha256(spec.seed).digest()
+    total = spec.difficulty
+    step = max(1, total // 100)
+
+    for i in range(1, total + 1):
+        h = hashlib.sha256(h).digest()
+        if progress is not None and i % step == 0:
+            progress(i, total)
+
+    return PuzzleSolution(final_hash=h, iterations=total)
 
 
 def estimate_seconds(hash_rate: float, difficulty: int) -> float:
@@ -160,5 +175,6 @@ def estimate_seconds(hash_rate: float, difficulty: int) -> float:
     Raises:
         ValueError: If ``hash_rate`` is not positive.
     """
-    # TODO(TICKET-002): implement — division with input validation.
-    raise NotImplementedError
+    if hash_rate <= 0:
+        raise ValueError(f"hash_rate must be positive, got {hash_rate}")
+    return difficulty / hash_rate
