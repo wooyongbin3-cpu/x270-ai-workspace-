@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <mipmap name="ic_launcher">#FF0000</mipmap>
-    <mipmap name="ic_launcher_round">#FF0000</mipmap>
-    <item name="file_paths" type="xml">@null</item>
-</resources>
