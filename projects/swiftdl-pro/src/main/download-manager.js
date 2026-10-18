@@ -1,317 +1,390 @@
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const crypto = require('crypto');
+const { EventEmitter } = require('events');
+
+const MAX_REDIRECTS = 10;
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 3000;
+const REQUEST_TIMEOUT_MS = 120000;
+const PART_SUFFIX = '.part';
+
+const FILE_TYPES = {
+  video: ['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'm4v', 'ts'],
+  audio: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'opus'],
+  image: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff'],
+  archive: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'iso', 'xz', 'tgz'],
+  document: ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'ppt', 'psd', 'ai', 'odt', 'epub', 'md'],
+  installer: ['exe', 'msi', 'dmg', 'deb', 'rpm', 'appimage', 'app'],
+  code: ['py', 'js', 'java', 'cpp', 'c', 'rb', 'go', 'rs', 'php', 'sh', 'bat'],
+  torrent: ['torrent'],
+};
+
+const ICONS = {
+  video: 'fa-film', audio: 'fa-music', image: 'fa-image', document: 'fa-file-alt',
+  archive: 'fa-file-archive', installer: 'fa-tools', code: 'fa-code', torrent: 'fa-magnet', other: 'fa-file',
+};
+
+function getFileType(filename) {
+  const ext = path.extname(filename).toLowerCase().slice(1);
+  for (const [type, exts] of Object.entries(FILE_TYPES)) {
+    if (exts.includes(ext)) return type;
+  }
+  return 'other';
+}
+
+/** Make a URL- or header-supplied name safe to use as a single file name. */
+function sanitizeFilename(name) {
+  const cleaned = String(name || '')
+    .replace(/[\u0000-\u001f<>:"/\\|?*]/g, '_')
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+    .slice(0, 200);
+  if (!cleaned || /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i.test(cleaned)) {
+    return 'download_' + crypto.randomBytes(6).toString('hex');
+  }
+  return cleaned;
+}
+
+function filenameFromUrl(url) {
+  try {
+    const last = new URL(url).pathname.split('/').pop();
+    return sanitizeFilename(decodeURIComponent(last));
+  } catch {
+    return sanitizeFilename('');
+  }
+}
+
+function filenameFromDisposition(header) {
+  if (!header) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(header);
+  if (star) {
+    try { return sanitizeFilename(decodeURIComponent(star[1].trim())); } catch { /* fall through */ }
+  }
+  const plain = /filename\s*=\s*"?([^";]+)"?/.exec(header);
+  return plain ? sanitizeFilename(plain[1].trim()) : null;
+}
+
+/** Return `dir/name`, or `dir/name (n).ext` if that file already exists. */
+function uniquePath(dir, name, taken) {
+  const ext = path.extname(name);
+  const base = name.slice(0, name.length - ext.length);
+  for (let n = 0; ; n++) {
+    const candidate = path.join(dir, n === 0 ? name : `${base} (${n})${ext}`);
+    if (!taken.has(candidate) && !fs.existsSync(candidate) && !fs.existsSync(candidate + PART_SUFFIX)) {
+      return candidate;
+    }
+  }
+}
 
 class DownloadTask {
-  constructor(id, url, saveDir, numThreads) {
+  constructor(id, url, saveDir) {
     this.id = id;
     this.url = url;
     this.saveDir = saveDir;
-    this.numThreads = numThreads;
     this.status = 'pending';
-    this.progress = 0;
     this.downloadedBytes = 0;
     this.totalBytes = 0;
     this.speed = 0;
-    this.maxSpeed = 0; // 0 = unlimited
-    this.filename = '';
     this.error = null;
     this.createdAt = Date.now();
-    this.lastUpdated = Date.now();
+    this.lastUpdated = this.createdAt;
+    this.startedAt = null;
     this.completedAt = null;
-    this.type = 'other';
+    this.filePath = null;
+    this.filename = filenameFromUrl(url);
     this._request = null;
     this._retries = 0;
-    this._maxRetries = 3;
-    this._queuePosition = 0;
-    this._elapsedTime = 0;
-    this.extractFilename(url);
-    this.type = this.getFileType(this.filename);
+    this._retryTimer = null;
   }
 
-  extractFilename(url) {
-    try {
-      const parsed = new URL(url);
-      let name = decodeURIComponent(parsed.pathname.split('/').pop());
-      if (!name || !name.includes('.')) {
-        const ext = this.getDefaultExt(url);
-        name = 'download_' + crypto.randomBytes(6).toString('hex') + ext;
-      }
-      this.filename = name;
-    } catch (e) {
-      this.filename = 'download_' + crypto.randomBytes(8).toString('hex');
-    }
+  get type() { return getFileType(this.filename); }
+
+  get progress() {
+    if (this.status === 'completed') return 100;
+    if (!this.totalBytes) return 0;
+    return Math.min(100, (this.downloadedBytes / this.totalBytes) * 100);
   }
 
-  getDefaultExt(url) {
-    const map = {'/zip':'.zip','/pdf':'.pdf','/exe':'.exe','/dmg':'.dmg','/tar.gz':'.tar.gz','/mp4':'.mp4','/mp3':'.mp3','/jpg':'.jpg','/png':'.png','/rar':'.rar','/7z':'.7z'};
-    const low = url.toLowerCase();
-    for (const [k,v] of Object.entries(map)) { if (low.includes(k)) return v; }
-    return '.bin';
-  }
+  get partPath() { return this.filePath + PART_SUFFIX; }
 
-  getFileType(filename) {
-    const ext = path.extname(filename).toLowerCase().slice(1);
-    if (['mp4','avi','mov','mkv','wmv','flv','webm','m4v','ts'].includes(ext)) return 'video';
-    if (['mp3','wav','flac','aac','ogg','wma','opus'].includes(ext)) return 'audio';
-    if (['jpg','jpeg','png','gif','bmp','svg','webp','ico','tiff'].includes(ext)) return 'image';
-    if (['zip','rar','7z','tar','gz','bz2','iso','xz','tgz'].includes(ext)) return 'archive';
-    if (['pdf','doc','docx','txt','xlsx','ppt','psd','ai','odt','epub','md'].includes(ext)) return 'document';
-    if (['exe','msi','dmg','deb','rpm','appimage','app'].includes(ext)) return 'installer';
-    if (['py','js','java','cpp','c','rb','go','rs','ts','php','sh','bat'].includes(ext)) return 'code';
-    if (['torrent','magnet'].includes(ext)) return 'torrent';
-    return 'other';
-  }
-
-  get filePath() { return path.join(this.saveDir, this.filename); }
-
-  get remaining() {
-    if (this.totalBytes === 0) return '--';
-    const rem = this.totalBytes - this.downloadedBytes;
-    return rem > 0 ? rem : 0;
-  }
-
-  get icon() {
-    const m = {video:'fa-film',audio:'fa-music',image:'fa-image',document:'fa-file-alt',archive:'fa-file-archive',installer:'fa-tools',code:'fa-code',torrent:'fa-magnet',other:'fa-file'};
-    return m[this.type] || 'fa-file';
-  }
-
-  get statusLabel() {
-    const m = {pending:'等待中',downloading:'下載中',paused:'已暫停',completed:'已完成',error:'失敗'};
-    return m[this.status] || this.status;
+  toJSON() {
+    return {
+      id: this.id, url: this.url, filename: this.filename, type: this.type, icon: ICONS[this.type],
+      status: this.status, progress: this.progress, downloadedBytes: this.downloadedBytes,
+      totalBytes: this.totalBytes, speed: this.speed, error: this.error,
+      createdAt: this.createdAt, lastUpdated: this.lastUpdated, completedAt: this.completedAt,
+      filePath: this.filePath, saveDir: this.saveDir,
+      elapsedTime: this.completedAt && this.startedAt ? (this.completedAt - this.startedAt) / 1000 : 0,
+    };
   }
 }
 
-class DownloadManager {
-  constructor() {
+/**
+ * Queue-based HTTP(S) download manager.
+ *
+ * Data is streamed into `<file>.part` and renamed on completion, so a
+ * finished file is never half-written. Pause/resume and retries continue from
+ * the `.part` file with a Range request when the server supports it.
+ *
+ * Emits `change` whenever a task's state changes.
+ */
+class DownloadManager extends EventEmitter {
+  constructor({ maxConcurrent = 3, retryBaseMs = RETRY_BASE_MS } = {}) {
+    super();
     this.tasks = new Map();
     this.nextId = 1;
-    this.stats = { totalDownloads: 0, totalBytesDownloaded: 0, totalTimeSpent: 0 };
+    this.maxConcurrent = maxConcurrent;
+    this.retryBaseMs = retryBaseMs;
+    this.stats = { totalDownloads: 0, totalBytesDownloaded: 0 };
   }
 
-  async addDownload(url, saveDir, numThreads) {
-    const task = new DownloadTask(this.nextId++, url, saveDir, numThreads || 4);
-    task._queuePosition = Array.from(this.tasks.values()).filter(t => t.status === 'pending' || t.status === 'downloading').length + 1;
-    if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
-    this.tasks.set(task.id, task);
-    
-    // Auto-start if under concurrent limit
-    const activeCount = Array.from(this.tasks.values()).filter(t => t.status === 'downloading').length;
-    if (activeCount < (numThreads || 4)) {
-      this.startDownload(task);
+  setMaxConcurrent(n) {
+    const value = Number.parseInt(n, 10);
+    if (Number.isInteger(value) && value > 0) {
+      this.maxConcurrent = Math.min(value, 16);
+      this._pump();
     }
+  }
+
+  addDownload(url, saveDir) {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid URL');
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Only http:// and https:// URLs are supported');
+    }
+    if (!saveDir) throw new Error('No save directory');
+    fs.mkdirSync(saveDir, { recursive: true });
+    const task = new DownloadTask(this.nextId++, parsed.href, path.resolve(saveDir));
+    this.tasks.set(task.id, task);
+    this._changed(task);
+    this._pump();
     return task.id;
   }
 
-  startDownload(task) {
-    if (task.status !== 'pending' && task.status !== 'paused') return;
-    task.status = 'downloading';
-    task._retries = 0;
-    this.fetchContentLength(task);
-    try {
-      this.downloadViaHttp(task);
-    } catch(e) {
-      this.handleError(task, e.message);
+  /** Start queued tasks while there are free download slots. */
+  _pump() {
+    let active = this._activeCount();
+    for (const task of this.tasks.values()) {
+      if (active >= this.maxConcurrent) break;
+      if (task.status === 'pending') {
+        active++;
+        this._start(task);
+      }
     }
   }
 
-  downloadViaHttp(task) {
-    const mod = task.url.startsWith('https') ? require('https') : require('http');
-    const targetPath = task.filePath;
-    let resumeOffset = 0;
+  _activeCount() {
+    let n = 0;
+    for (const t of this.tasks.values()) if (t.status === 'downloading') n++;
+    return n;
+  }
 
-    // Resume from existing partial file
-    if (fs.existsSync(targetPath)) {
-      resumeOffset = fs.statSync(targetPath).size;
-      task.downloadedBytes = resumeOffset;
-    }
+  _changed(task) {
+    task.lastUpdated = Date.now();
+    this.emit('change', task);
+  }
 
-    const req = mod.request(task.url, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'SwiftDL-Pro/1.0',
-        ...(resumeOffset > 0 ? { 'Range': 'bytes=' + resumeOffset + '-' } : {})
+  _start(task) {
+    task.status = 'downloading';
+    task.error = null;
+    task.startedAt = task.startedAt || Date.now();
+    this._changed(task);
+    this._request(task, task.url, 0);
+  }
+
+  _request(task, url, redirects) {
+    const offset = task.filePath && fs.existsSync(task.partPath) ? fs.statSync(task.partPath).size : 0;
+    const mod = url.startsWith('https:') ? https : http;
+    const headers = { 'User-Agent': 'SwiftDL-Pro/1.0' };
+    if (offset > 0) headers.Range = `bytes=${offset}-`;
+
+    const req = mod.get(url, { headers }, (res) => {
+      if (task.status !== 'downloading') { res.resume(); return; }
+
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        if (redirects >= MAX_REDIRECTS) return this._fail(task, 'Too many redirects');
+        return this._request(task, new URL(res.headers.location, url).href, redirects + 1);
       }
-    }, (res) => {
-      // Handle redirects
-      if ([301,302,303,307,308].includes(res.statusCode)) {
-        task.url = res.headers.location;
-        req.destroy();
-        this.fetchContentLength(task);
-        this.downloadViaHttp(task);
-        return;
+      if (res.statusCode === 416 && offset > 0) {
+        // Range past the end: the .part file already holds everything.
+        res.resume();
+        return this._finish(task);
+      }
+      if (res.statusCode !== 200 && res.statusCode !== 206) {
+        res.resume();
+        const retryable = res.statusCode >= 500 || res.statusCode === 429;
+        return this._fail(task, `HTTP ${res.statusCode}`, retryable);
       }
 
-      // Update total size from content-length
-      const cl = parseInt(res.headers['content-length'], 10);
-      if (!isNaN(cl)) {
-        task.totalBytes = resumeOffset + cl;
-      } else if (task.totalBytes === 0) {
-        task.totalBytes = 50 * 1024 * 1024; // fallback estimate
+      if (!task.filePath) {
+        const name = filenameFromDisposition(res.headers['content-disposition']) || task.filename;
+        task.filePath = uniquePath(task.saveDir, name, this._takenPaths(task));
+        task.filename = path.basename(task.filePath);
       }
 
-      const ws = fs.createWriteStream(targetPath, { flags: 'a', start: resumeOffset });
-      let dlv = 0, lastT = Date.now();
-      let dataChunks = [];
+      const resuming = res.statusCode === 206 && offset > 0;
+      const length = Number.parseInt(res.headers['content-length'], 10);
+      task.downloadedBytes = resuming ? offset : 0;
+      task.totalBytes = Number.isNaN(length) ? 0 : task.downloadedBytes + length;
+
+      const out = fs.createWriteStream(task.partPath, { flags: resuming ? 'a' : 'w' });
+      let windowBytes = 0;
+      let windowStart = Date.now();
 
       res.on('data', (chunk) => {
-        // Speed limit check
-        if (task.maxSpeed > 0) {
-          dataChunks.push(chunk);
-          // Simple rate limiting would go here
-        }
-        dlv += chunk.length;
         task.downloadedBytes += chunk.length;
-
+        windowBytes += chunk.length;
         const now = Date.now();
-        if (now - lastT >= 1000) {
-          task.speed = Math.round(dlv / ((now - lastT) / 1000));
-          dlv = 0;
-          lastT = now;
-        }
-
-        if (task.totalBytes > 0) {
-          task.progress = Math.min(Math.round((task.downloadedBytes / task.totalBytes) * 100), 100);
-        }
-        task.lastUpdated = Date.now();
-      });
-
-      res.on('end', () => {
-        ws.end();
-        task.stats = task.stats || {};
-        task.stats.downloadedBytes = task.downloadedBytes;
-        if (task.status === 'downloading' || task.status === 'paused') {
-          task.status = 'completed';
-          task.progress = 100;
-          task.speed = 0;
-          task.completedAt = Date.now();
-          task._elapsedTime = (task.completedAt - task.createdAt) / 1000;
-          this.stats.totalDownloads++;
-          this.stats.totalBytesDownloaded += task.downloadedBytes;
+        if (now - windowStart >= 1000) {
+          task.speed = Math.round(windowBytes / ((now - windowStart) / 1000));
+          windowBytes = 0;
+          windowStart = now;
         }
       });
-
+      res.on('aborted', () => out.destroy());
       res.on('error', (err) => {
-        ws.end();
-        if (task.status === 'downloading') {
-          this.handleRetry(task, err.message);
+        out.destroy();
+        this._fail(task, err.message, true);
+      });
+      out.on('error', (err) => {
+        req.destroy();
+        this._fail(task, err.message, false);
+      });
+      // 'close' (not 'finish') so the file handle is released before the
+      // rename — Windows refuses to rename a file that is still open.
+      out.on('close', () => {
+        if (task.status !== 'downloading' || !out.writableFinished) return;
+        if (task.totalBytes && task.downloadedBytes < task.totalBytes) {
+          this._fail(task, 'Connection closed early', true);
+        } else {
+          this._finish(task);
         }
       });
-
-      ws.on('error', (err) => {
-        if (task.status === 'downloading') {
-          this.handleRetry(task, err.message);
-        }
-      });
+      res.pipe(out);
     });
 
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => req.destroy(new Error('Download timeout')));
     req.on('error', (err) => {
-      if (task.status === 'downloading') {
-        this.handleRetry(task, err.message);
-      }
+      if (task.status === 'downloading') this._fail(task, err.message, true);
     });
-
-    req.setTimeout(120000, () => {
-      req.destroy();
-      if (task.status === 'downloading') {
-        this.handleRetry(task, 'Download timeout');
-      }
-    });
-
-    req.end();
     task._request = req;
   }
 
-  handleRetry(task, errorMsg) {
-    task._retries++;
-    if (task._retries <= task._maxRetries) {
-      task.error = errorMsg;
-      task.status = 'error';
-      // Wait then retry
-      setTimeout(() => {
-        if (task.status === 'error') {
-          this.startDownload(task);
-        }
-      }, 3000 * task._retries);
-    } else {
-      task.error = errorMsg + ' (max retries: ' + task._maxRetries + ')';
-      task.status = 'error';
-      task.speed = 0;
-      try { fs.unlinkSync(task.filePath); } catch(e) {}
-    }
+  _takenPaths(except) {
+    const taken = new Set();
+    for (const t of this.tasks.values()) if (t !== except && t.filePath) taken.add(t.filePath);
+    return taken;
   }
 
-  handleError(task, msg) {
-    task.status = 'error';
-    task.error = msg;
+  _finish(task) {
+    try {
+      fs.renameSync(task.partPath, task.filePath);
+    } catch (err) {
+      return this._fail(task, err.message, false);
+    }
+    task.status = 'completed';
+    task.speed = 0;
+    task.completedAt = Date.now();
+    if (!task.totalBytes) task.totalBytes = task.downloadedBytes;
+    task._request = null;
+    this.stats.totalDownloads++;
+    this.stats.totalBytesDownloaded += task.downloadedBytes;
+    this._changed(task);
+    this._pump();
+  }
+
+  _fail(task, message, retryable = true) {
+    if (task.status !== 'downloading') return;
+    task.speed = 0;
+    task._request = null;
+    if (retryable && task._retries < MAX_RETRIES) {
+      task._retries++;
+      task.status = 'retrying';
+      task.error = `${message} — retry ${task._retries}/${MAX_RETRIES}`;
+      task._retryTimer = setTimeout(() => {
+        task._retryTimer = null;
+        if (task.status === 'retrying') {
+          task.status = 'pending';
+          this._pump();
+        }
+      }, this.retryBaseMs * task._retries);
+    } else {
+      task.status = 'error';
+      task.error = message;
+    }
+    this._changed(task);
+    this._pump();
+  }
+
+  _abort(task) {
+    clearTimeout(task._retryTimer);
+    task._retryTimer = null;
+    if (task._request) task._request.destroy();
+    task._request = null;
     task.speed = 0;
   }
 
-  fetchContentLength(task) {
-    const mod = task.url.startsWith('https') ? require('https') : require('http');
-    const req = mod.request(task.url, { method: 'HEAD', timeout: 5000 }, (res) => {
-      const cl = res.headers['content-length'];
-      if (cl) task.totalBytes = parseInt(cl, 10);
-      res.resume();
-    });
-    req.on('error', () => {});
-    req.end();
+  pauseTask(id) {
+    const task = this.tasks.get(id);
+    if (!task || !['downloading', 'pending', 'retrying'].includes(task.status)) return false;
+    task.status = 'paused';
+    this._abort(task);
+    this._changed(task);
+    this._pump();
+    return true;
   }
 
-  pauseTask(taskId) {
-    const task = this.tasks.get(taskId);
-    if (task && task.status === 'downloading') {
-      task.status = 'paused';
-      task.speed = 0;
-      if (task._request) try { task._request.destroy(); } catch(e) {}
-    }
+  resumeTask(id) {
+    const task = this.tasks.get(id);
+    if (!task || (task.status !== 'paused' && task.status !== 'error')) return false;
+    task.status = 'pending';
+    task.error = null;
+    task._retries = 0;
+    this._changed(task);
+    this._pump();
+    return true;
   }
 
-  resumeTask(taskId) {
-    const task = this.tasks.get(taskId);
-    if (task && (task.status === 'paused' || task.status === 'error')) {
-      task.status = 'downloading';
-      task.error = null;
-      task._retries = 0;
-      this.startDownload(task);
+  /** Forget a task. Unfinished downloads also lose their `.part` file; finished files are kept. */
+  removeTask(id) {
+    const task = this.tasks.get(id);
+    if (!task) return false;
+    const wasActive = task.status === 'downloading';
+    task.status = 'removed';
+    this._abort(task);
+    if (task.filePath && !task.completedAt) {
+      fs.rm(task.partPath, { force: true }, () => {});
     }
-  }
-
-  removeTask(taskId) {
-    const task = this.tasks.get(taskId);
-    if (task) {
-      if (task._request) try { task._request.destroy(); } catch(e) {}
-      try { if (fs.existsSync(task.filePath)) fs.unlinkSync(task.filePath); } catch(e) {}
-      this.tasks.delete(taskId);
-    }
+    this.tasks.delete(id);
+    this.emit('change', task);
+    if (wasActive) this._pump();
+    return true;
   }
 
   clearCompleted() {
-    for (const [id] of this.tasks) {
-      const t = this.tasks.get(id);
-      if (t.status === 'completed') this.removeTask(id);
+    for (const task of [...this.tasks.values()]) {
+      if (task.status === 'completed') this.removeTask(task.id);
     }
   }
 
-  setSpeedLimit(taskId, limit) {
-    const task = this.tasks.get(taskId);
-    if (task) { task.maxSpeed = limit; }
+  getTask(id) {
+    return this.tasks.get(id);
   }
 
   getStats() {
-    return { ...this.stats, totalTasks: this.tasks.size, activeTasks: Array.from(this.tasks.values()).filter(t => t.status === 'downloading').length };
+    return { ...this.stats, totalTasks: this.tasks.size, activeTasks: this._activeCount() };
   }
 
   getDownloads() {
-    return Array.from(this.tasks.values()).map(t => ({
-      id: t.id, url: t.url, filename: t.filename, type: t.type, icon: t.icon,
-      status: t.status, progress: t.progress, downloadedBytes: t.downloadedBytes,
-      totalBytes: t.totalBytes, speed: t.speed, error: t.error,
-      createdAt: t.createdAt, lastUpdated: t.lastUpdated, completedAt: t.completedAt,
-      filePath: t.filePath, saveDir: t.saveDir, maxSpeed: t.maxSpeed,
-      elapsedTime: t._elapsedTime || 0
-    }));
+    return [...this.tasks.values()].map((t) => t.toJSON());
   }
 }
 
-module.exports = { DownloadManager, DownloadTask };
+module.exports = { DownloadManager, DownloadTask, sanitizeFilename, filenameFromDisposition, getFileType };

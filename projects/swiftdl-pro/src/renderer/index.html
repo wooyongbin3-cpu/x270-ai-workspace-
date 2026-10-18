@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data:">
 <title>SwiftDL Pro - 萬能通用下載器</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -54,7 +55,7 @@ textarea:focus,input[type=text]:focus{outline:none;border-color:var(--accent)}
 .main{padding:18px 24px;overflow-y:auto}
 .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
 .toolbar h2{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
-.tabs{display:flex;gap:6px;flex-wrap:wrap}.tab{padding:5px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);font-size:11px;cursor:pointer;transition:all .2s}.tab.active,.tab:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}.tab{padding:5px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);font-size:11px;cursor:pointer;transition:all .2s}.tab.active,.tab:hover,.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 /* Drop zone */
 .dz{border:2px dashed var(--border);border-radius:var(--radius);padding:26px;text-align:center;color:var(--text-secondary);cursor:pointer;transition:all .3s;margin-bottom:16px}.dz:hover,.dz.over{border-color:var(--accent);background:var(--glow)}.dz i{font-size:34px;color:var(--accent);margin-bottom:8px}.dz p{font-size:13px;margin-bottom:4px}.dz small{font-size:11px;opacity:.7}
@@ -106,7 +107,6 @@ input[type=checkbox]{appearance:none;width:16px;height:16px;border:2px solid var
   <div class="hbtns">
     <button class="hbtn" id="themeBtn"><i class="fas fa-moon"></i> <span id="themeLabel">夜間</span></button>
     <button class="hbtn" id="pasteBtn" title="從剪貼簿貼上網址"><i class="fas fa-clipboard"></i> 貼上連結</button>
-    <button class="hbtn" id="addLocalBtn" title="添加本地文件"><i class="fas fa-folder-plus"></i> 本地文件</button>
     <button class="hbtn" id="aboutBtn"><i class="fas fa-info-circle"></i></button>
   </div>
 </header>
@@ -133,7 +133,7 @@ input[type=checkbox]{appearance:none;width:16px;height:16px;border:2px solid var
     <div class="pnl">
       <div class="pnl-t"><i class="fas fa-sliders-h"></i> 下載設置</div>
       <div class="srow"><label>同時下載數</label><select id="maxConcurrent"><option value="1">1</option><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select></div>
-      <div class="srow"><label>保存路徑</label><input type="text" id="savePath" value="./Downloads" style="width:120px;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;font-size:11px"></div>
+      <div class="srow"><label>保存路徑</label><input type="text" id="savePath" value="" placeholder="系統下載資料夾" style="width:120px;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;font-size:11px"></div>
     </div>
 
     <div class="sg">
@@ -156,13 +156,13 @@ input[type=checkbox]{appearance:none;width:16px;height:16px;border:2px solid var
         <div class="tab" data-f="pending">等待中</div>
       </div>
     </div>
-    <div class="dz" id="dropZone"><i class="fas fa-cloud-arrow-down"></i><p>拖放文件或連結到此處</p><small>支持拖放多個文件或 URL</small></div>
+    <div class="dz" id="dropZone"><i class="fas fa-cloud-arrow-down"></i><p>拖放連結到此處</p><small>支持從瀏覽器拖放一個或多個 URL</small></div>
     <div class="dlist" id="dlList"></div>
   </main>
 </div>
 
 <footer class="statusbar">
-  <div class="spd"><span><i class="fas fa-arrow-down"></i> <strong id="dlSpeed">0 KB/s</strong></span><span><i class="fas fa-arrow-up"></i> <strong id="upSpeed">0 B/s</strong></span><span><i class="fas fa-clock"></i> <span id="clock"></span></span></div>
+  <div class="spd"><span><i class="fas fa-arrow-down"></i> <strong id="dlSpeed">0 KB/s</strong></span><span><i class="fas fa-clock"></i> <span id="clock"></span></span></div>
   <div>SwiftDL Pro 萬能通用下載器 &copy; 2025 | Built with Electron</div>
 </footer>
 
@@ -182,347 +182,10 @@ input[type=checkbox]{appearance:none;width:16px;height:16px;border:2px solid var
       <i class="fas fa-check-circle" style="color:var(--green)"></i> 拖放添加下載<br><br>
       Built with ❤️ by wooyongbin3-cpu
     </p>
-    <button class="btn-p" onclick="document.getElementById('aboutModal').classList.remove('active')" style="margin-top:12px">關閉</button>
+    <button class="btn-p" data-close style="margin-top:12px">關閉</button>
   </div>
 </div>
 
-<script>
-// ===== Global State =====
-let downloads = [];
-let filter = 'all';
-let isDark = true;
-let totalBytes = 0;
-let selectedIds = new Set();
-let cleanups = [];
-let clipboardUrls = [];
-
-// ===== DOM helpers =====
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => document.querySelectorAll(s);
-
-// ===== Utilities =====
-const fmtSize = (b) => {
-  if(!b || b===0) return '0 B';
-  const u=['B','KB','MB','GB','TB'];
-  const i=Math.floor(Math.log(b)/Math.log(1024));
-  return parseFloat((b/Math.pow(1024,i)).toFixed(1))+' '+u[i];
-};
-
-function toast(msg,type='success'){
-  const t=document.createElement('div');
-  t.className='toast'+(type==='error'?' err':type==='warning'?' warn':'');
-  const icons={success:'check-circle',error:'exclamation-circle',warning:'exclamation-triangle'};
-  t.innerHTML='<i class="fas fa-'+icons[type]+'" style="color:var(--'+(type==='error'?'red':type==='warning'?'yellow':'green')+ ')"></i><span>'+msg+'</span>';
-  document.body.appendChild(t);
-  setTimeout(()=>{t.style.animation='sIn .3s ease reverse';setTimeout(()=>t.remove(),300)},3000);
-}
-
-function timeAgo(ts){
-  const s=Math.floor((Date.now()-ts)/1000);
-  if(s<60)return'剛剛';if(s<3600)return Math.floor(s/60)+' 分钟前';
-  if(s<86400)return Math.floor(s/3600)+' 小时前';return Math.floor(s/86400)+' 天前';
-}
-
-function formatElapsed(seconds){
-  if(!seconds||seconds===0)return'--';
-  const h=Math.floor(seconds/3600);
-  const m=Math.floor((seconds%3600)/60);
-  const s=Math.floor(seconds%60);
-  return(h>0?h+':':'')+(m>0||(h>0)?String(m).padStart(2,'0'):s)+(h>0?'':'秒');
-}
-
-// ===== Particles =====
-function mkParticles(){
-  const c=$('#particles');
-  for(let i=0;i<50;i++){
-    const p=document.createElement('div');
-    p.className='particle';
-    p.style.left=Math.random()*100+'%';
-    p.style.animationDuration=(Math.random()*15+10)+'s';
-    p.style.animationDelay=(Math.random()*10)+'s';
-    p.style.width=p.style.height=(Math.random()*3+1)+'px';
-    c.appendChild(p);
-  }
-}
-
-// ===== Theme =====
-$('#themeBtn').onclick=()=>{
-  isDark=!isDark;
-  document.documentElement.setAttribute('data-theme',isDark?'':'light');
-  $('#themeBtn i').className=isDark?'fas fa-moon':'fas fa-sun';
-  $('#themeLabel').textContent=isDark?'夜間':'日間';
-};
-
-// ===== Render =====
-function render(){
-  const filtered=filter==='all'?downloads:downloads.filter(d=>d.status===filter);
-  const query=$('#searchInput').value.toLowerCase().trim();
-  const shown=query?filtered.filter(d=>d.filename.toLowerCase().includes(query)||d.url.toLowerCase().includes(query)):filtered;
-  
-  const list=$('#dlList');
-  if(shown.length===0){
-    list.innerHTML='<div class="empty"><i class="fas fa-inbox"></i><h3>'+(downloads.length===0?'暫無下載任務':'沒有匹配的任務')+'</h3><p>'+(downloads.length===0?'在左側輸入下載連結或拖放文件開始下載':'嘗試切換過濾條件或清除搜索')+'</p></div>';
-  } else {
-    list.innerHTML=shown.map(d=>{
-      const pct=d.progress.toFixed(1);
-      const downFmt=fmtSize(d.downloadedBytes);
-      const totFmt=fmtSize(d.totalBytes);
-      const spdStr=d.speed>0?fmtSize(d.speed)+'/s':'--';
-      const errStr=d.error?'<br><small style="color:var(--red)"><i class="fas fa-exclamation-triangle"></i> '+d.error.substring(0,60)+'</small':'';
-      const elapsed=d.elapsedTime?formatElapsed(d.elapsedTime):'';
-      
-      return '<div class="di" data-id="'+d.id+'" onclick="toggleSelect(event,'+d.id+')">'+
-        '<div class="dh">'+
-          '<div class="dic '+d.type+'"><i class="fas '+d.icon+'"></i></div>'+
-          '<div class="di-info">'+
-            '<div class="di-name" title="'+escHtml(d.filename)+'">'+escHtml(d.filename)+'</div>'+
-            '<div class="di-meta">'+
-              '<span><i class="fas fa-tag"></i> '+d.type.toUpperCase()+'</span>'+
-              '<span><i class="fas fa-link"></i> <small style="color:var(--text-muted)">'+escHtml(truncUrl(d.url,50))+'</small></span>'+
-              '<span><i class="fas fa-clock"></i> '+timeAgo(d.createdAt)+'</span>'+
-              (elapsed?'<span><i class="fas fa-hourglass-half"></i> '+elapsed+'</span>':'')+
-            '</div>'+
-          '</div>'+
-          '<span class="di-badge '+d.status+'">'+d.status+'</span>'+
-        '</div>'+
-        '<div class="pbg"><div class="pbar" style="width:'+pct+'%"></div></div>'+
-        '<div class="pi"><span>'+pct+'%</span><span>'+downFmt+' / '+totFmt+'</span><span>'+spdStr+'</span></div>'+
-        (d.error?'<div style="font-size:10px;color:var(--red);margin-bottom:8px;"><i class="fas fa-times-circle"></i> '+escHtml(d.error.substring(0,100))+'</div>':'')+
-        '<div class="da">'+
-          (d.status==='downloading'?'<button class="ab" onclick="event.stopPropagation();pauseDl('+d.id+')"><i class="fas fa-pause"></i> 暫停</button>':'')+
-          (d.status==='paused'||d.status==='error'?'<button class="ab" onclick="event.stopPropagation();resumeDl('+d.id+')"><i class="fas fa-play"></i> '+((d.status==='error')?'重試':'繼續')+'</button>':'')+
-          (d.status!=='completed'?'<button class="ab danger" onclick="event.stopPropagation();removeDl('+d.id+')"><i class="fas fa-trash"></i> 刪除</button>':'')+
-          (d.status==='completed'?'<button class="ab" onclick="event.stopPropagation();openFile(''+escAttr(d.filePath)+'')"><i class="fas fa-folder-open"></i> 打開</button><button class="ab" onclick="event.stopPropagation();openFolder(''+escAttr(d.filePath)+'')"><i class="fas fa-folder"></i> 資料夾</button>':'')+
-          '<button class="ab" onclick="event.stopPropagation();copyUrl(''+escAttr(d.url)+'')"><i class="fas fa-copy"></i> 複製</button>'+
-          '<label style="margin-left:auto"><input type="checkbox" '+((selectedIds.has(d.id))?'checked':'')+' onclick="event.stopPropagation();toggleCheck('+d.id+')"></label>'+
-        '</div>'+
-      '</div>';
-    }).join('');
-  }
-  
-  updateStats();
-  updateBulkActions();
-}
-
-function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function escAttr(s){return(s||'').replace(/'/g,"\'").replace(/"/g,'&quot;');}
-function truncUrl(url,max){try{return new URL(url).hostname+'...'+new URL(url).pathname.split('/').pop().substring(0,20);}catch{return(url||'').substring(0,max)+'...';}}
-
-function updateStats(){
-  if(!$('#sTotal'))return;
-  $('#sTotal').textContent=downloads.length;
-  $('#sActive').textContent=downloads.filter(d=>d.status==='downloading').length;
-  $('#sDone').textContent=downloads.filter(d=>d.status==='completed').length;
-  const failed=downloads.filter(d=>d.status==='error').length;
-  totalBytes=downloads.reduce((s,d)=>s+d.downloadedBytes,0);
-  $('#sSize').textContent=fmtSize(totalBytes);
-  // Show pending in total if any
-}
-
-function updateSpeedBar(){
-  let ds=0,us=0;
-  downloads.forEach(d=>{if(d.status==='downloading'){ds+=d.speed;us+=d.speed*.05;}});
-  $('#dlSpeed').textContent=fmtSize(ds)+'/s';
-  $('#upSpeed').textContent=fmtSize(us)+'/s';
-}
-
-function updateBulkActions(){
-  // Could add bulk action buttons when items are selected
-}
-
-// ===== Selection =====
-window.toggleSelect=(e,id)=>{
-  if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')return;
-  if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);
-  render();
-};
-window.toggleCheck=(id)=>{
-  if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);
-  render();
-};
-
-// ===== Download Control =====
-window.addDownload=async(url)=>{
-  if(!url||url.trim()===''){toast('請輸入下載鏈接','warning');return;}
-  try{new URL(url);}catch(e){toast('無效的 URL','error');return;}
-  const savePath=$('#savePath').value||'./Downloads';
-  const threads=parseInt($('#maxConcurrent').value);
-  try{
-    const res=await window.swiftDL.addDownload(url.trim(),savePath,threads);
-    if(res.ok)toast('已添加: '+url.split('/').pop());
-    else toast('添加失敗: '+res.err,'error');
-  }catch(err){toast('錯誤: '+err.message,'error');}
-};
-
-window.pauseDl=async(id)=>{
-  await window.swiftDL.pause(id);
-  toast('已暫停','warning');render();
-};
-window.resumeDl=async(id)=>{
-  await window.swiftDL.resume(id);
-  toast('已恢復');render();
-};
-window.removeDl=async(id)=>{
-  await window.swiftDL.remove(id);
-  selectedIds.delete(id);
-  toast('已移除');render();
-};
-window.copyUrl=(url)=>{
-  if(navigator.clipboard)navigator.clipboard.writeText(url);
-  toast('鏈接已複製');
-};
-window.openFile=(fp)=>{
-  toast('正在打開文件...');
-};
-window.openFolder=(fp)=>{
-  toast('正在打開資料夾...');
-};
-
-// Bulk operations
-function bulkAction(action){
-  if(selectedIds.size===0){toast('請先選擇任務','warning');return;}
-  const ids=[...selectedIds];
-  window.swiftDL[action](ids).then(()=>{
-    toast('批量'+action+': '+ids.length+' 個');
-    selectedIds.clear();
-    render();
-  });
-}
-
-// ===== Events =====
-$('#addBtn').onclick=()=>addDownload($('#urlInput').value);
-$('#urlInput').onkeydown=(e)=>{if(e.key==='Enter')addDownload($('#urlInput').value);};
-
-$('#batchBtn').onclick=async()=>{
-  const urls=$('#batchInput').value.trim().split('\n').filter(u=>u.trim()).map(u=>({url:u.trim(),savePath:$('#savePath').value,threads:parseInt($('#maxConcurrent').value)}));
-  if(urls.length===0){toast('請輸入至少一個URL','warning');return;}
-  const results=await window.swiftDL.batchAdd(urls);
-  let ok=0,fail=0;
-  results.forEach(r=>{if(r.ok)ok++;else fail++;});
-  toast('完成: '+ok+' 成功, '+fail+' 失敗',fail>0?'warn':'success');
-  $('#batchInput').value='';
-};
-
-// Filter tabs
-$$('.tab').forEach(t=>{
-  t.onclick=()=>{
-    $$('.tab').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    filter=t.dataset.f;
-    render();
-  };
-});
-
-// Search
-$('#searchInput').oninput=render;
-
-// Drop zone
-const dz=$('#dropZone');
-dz.onclick=()=>toast('拖放文件到此區域添加下載任務','warning');
-dz.ondragover=(e)=>{e.preventDefault();dz.classList.add('over');};
-dz.ondragleave=()=>dz.classList.remove('over');
-dz.ondrop=(e)=>{
-  e.preventDefault();dz.classList.remove('over');
-  const files=e.dataTransfer.files;
-  const urlsData=e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain');
-  if(files.length>0){
-    Array.from(files).forEach(f=>{
-      const task={id:Date.now()+Math.random(),filename:f.name,type:getType(f.name),icon:iconFor(getType(f.name)),status:'pending',progress:0,downloadedBytes:0,totalBytes:f.size,speed:0,error:null,createdAt:Date.now(),lastUpdated:Date.now(),filePath:f.name,elapsedTime:0};
-      downloads.unshift(task);
-    });
-    render();toast('已添加 '+files.length+' 個文件');
-  }else if(urlsData){
-    urlsData.split('\r\n').forEach(url=>{
-      url=url.trim();
-      if(url&&url.startsWith('http'))addDownload(url);
-    });
-  }
-};
-
-// Paste button
-$('#pasteBtn').onclick=async()=>{
-  const res=await window.swiftDL.pasteUrl();
-  if(res.ok&&res.urls){
-    for(const url of res.urls){
-      addDownload(url);
-    }
-    toast('從剪貼簿添加了 '+res.urls.length+' 個鏈接');
-  }else{
-    toast('剪貼簿中沒有找到URL','warning');
-  }
-};
-
-// Local file button
-$('#addLocalBtn').onclick=()=>{
-  toast('拖放文件到上方區域以添加','warning');
-};
-
-// About modal
-$('#aboutBtn').onclick=()=>$('#aboutModal').classList.add('active');
-$('#aboutModal').onclick=(e)=>{if(e.target===$('#aboutModal')[0])$('#aboutModal').classList.remove('active');};
-
-// Keyboard shortcuts
-document.addEventListener('keydown',(e)=>{
-  if(e.ctrlKey&&e.key==='v'&&!e.target.closest('input,textarea')){
-    navigator.clipboard.readText().then(text=>{
-      const urls=text.match(/https?:\/\/[^\s<>"']+/g);
-      if(urls){urls.forEach(u=>addDownload(u));toast('從剪貼簿添加了 '+urls.length+' 個鏈接');}
-    });
-  }
-  if(e.key==='Escape')$('#aboutModal').classList.remove('active');
-});
-
-// Helper functions
-function getType(name){
-  const ext=name.split('.').pop().toLowerCase();
-  if(['mp4','avi','mov','mkv'].includes(ext))return'video';if(['mp3','wav','flac'].includes(ext))return'audio';
-  if(['jpg','png','gif','bmp','svg'].includes(ext))return'image';if(['zip','rar','7z','tar','gz'].includes(ext))return'archive';
-  if(['pdf','doc','txt','xlsx'].includes(ext))return'document';if(['torrent'].includes(ext))return'torrent';
-  return'other';
-}
-function iconFor(t){return{video:'fa-film',audio:'fa-music',image:'fa-image',document:'fa-file-alt',archive:'fa-file-archive',torrent:'fa-magnet',other:'fa-file'}[t]||'fa-file';}
-
-// ===== Electron IPC Integration =====
-if(window.swiftDL){
-  const cleanup=window.swiftDL.onProgress(data=>{
-    const existing=new Map(downloads.map(d=>[d.id,d]));
-    let newCount=0;
-    data.forEach(d=>{
-      if(existing.has(d.id)){
-        const ex=existing.get(d.id);
-        Object.assign(ex,d);
-      }else{
-        existing.set(d.id,d);
-        downloads.push(d);
-        newCount++;
-      }
-    });
-    // Remove IDs that no longer exist
-    const dataIds=new Set(data.map(d=>d.id));
-    downloads=downloads.filter(d=>dataIds.has(d.id));
-    if(newCount>0)toast('已添加 '+(newCount>1?' '+newCount+' 個':'')+' 下載任務');
-    render();updateSpeedBar();
-  });
-  cleanups.push(cleanup);
-
-  // Load initial state
-  window.swiftDL.getDownloads().then(data=>{
-    downloads=data;render();
-  });
-  window.swiftDL.getStats().then(stats=>{
-    console.log('Stats:',stats);
-  });
-}
-
-// Clock
-setInterval(()=>{
-  const now=new Date();
-  $('#clock').textContent=now.toLocaleString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-},1000);
-
-// Init
-mkParticles();
-render();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
