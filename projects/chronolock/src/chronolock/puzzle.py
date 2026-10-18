@@ -36,8 +36,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from chronolock.errors import PuzzleError
 
@@ -90,7 +90,7 @@ class PuzzleSolution:
     iterations: int
 
 
-def generate_seed(entropy_source: Optional[Callable[[int], bytes]] = None) -> bytes:
+def generate_seed(entropy_source: Callable[[int], bytes] | None = None) -> bytes:
     """Generate a fresh random seed for a new puzzle.
 
     Uses :func:`os.urandom` by default. The ``entropy_source`` parameter is
@@ -117,10 +117,12 @@ def validate_difficulty(difficulty: int) -> None:
     if not isinstance(difficulty, int) or isinstance(difficulty, bool):
         raise PuzzleError(f"difficulty must be an integer, got {type(difficulty).__name__}")
     if difficulty < MIN_DIFFICULTY or difficulty > MAX_DIFFICULTY:
-        raise PuzzleError(f"difficulty {difficulty} out of range [{MIN_DIFFICULTY}, {MAX_DIFFICULTY}]")
+        raise PuzzleError(
+            f"difficulty {difficulty} out of range [{MIN_DIFFICULTY}, {MAX_DIFFICULTY}]"
+        )
 
 
-def solve(spec: PuzzleSpec, progress: Optional[ProgressCallback] = None) -> PuzzleSolution:
+def solve(spec: PuzzleSpec, progress: ProgressCallback | None = None) -> PuzzleSolution:
     """Evaluate a puzzle by computing the full hash chain.
 
     Given a :class:`PuzzleSpec`, compute ``h_0 .. h_d`` in sequence and return

@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 #: Context string used to scope the HKDF key derivation. Changing this
 #: invalidates all existing vaults — never change it without a migration.
@@ -72,7 +71,7 @@ class EncryptedSecret:
     hmac: bytes
 
 
-def derive_keys(puzzle_final_hash: bytes) -> "tuple[bytes, bytes]":
+def derive_keys(puzzle_final_hash: bytes) -> tuple[bytes, bytes]:
     """Derive the encryption key and integrity key from a puzzle solution.
 
     Uses HKDF-SHA256 with a fixed context string and two distinct info labels
@@ -84,8 +83,8 @@ def derive_keys(puzzle_final_hash: bytes) -> "tuple[bytes, bytes]":
     Returns:
         A ``(encryption_key, integrity_key)`` tuple, each 32 bytes.
     """
-    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
     enc_key = HKDF(
         algorithm=hashes.SHA256(),
@@ -131,6 +130,7 @@ def encrypt(plaintext: str, puzzle_final_hash: bytes) -> EncryptedSecret:
     nonce = os.urandom(NONCE_LENGTH)
 
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     aesgcm = AESGCM(enc_key)
     ciphertext = aesgcm.encrypt(nonce, payload, None)
 
@@ -164,7 +164,7 @@ def decrypt(encrypted: EncryptedSecret, puzzle_final_hash: bytes) -> str:
         cryptography.exceptions.InvalidTag: If GCM authentication fails.
     """
     import hmac as hmac_mod
-    from cryptography.exceptions import InvalidTag
+
     from chronolock.errors import IntegrityError
 
     enc_key, mac_key = derive_keys(puzzle_final_hash)
@@ -174,6 +174,7 @@ def decrypt(encrypted: EncryptedSecret, puzzle_final_hash: bytes) -> str:
         raise IntegrityError("integrity check failed: ciphertext or nonce was tampered with")
 
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     aesgcm = AESGCM(enc_key)
     plaintext_bytes = aesgcm.decrypt(encrypted.nonce, encrypted.ciphertext + encrypted.tag, None)
     return plaintext_bytes.decode("utf-8")
@@ -194,6 +195,7 @@ def compute_hmac(key: bytes, data: bytes) -> bytes:
     """
     import hashlib
     import hmac as hmac_mod
+
     return hmac_mod.new(key, data, hashlib.sha256).digest()
 
 

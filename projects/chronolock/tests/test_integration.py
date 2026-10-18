@@ -12,12 +12,12 @@ no stubs, real cryptography and real disk I/O.
 from __future__ import annotations
 
 import time
-from typing import Callable
 
 import pytest
 
-from chronolock import crypto, puzzle, store, vault
-from chronolock.model import VaultMetadata, VaultStatus
+from chronolock import vault
+from chronolock.errors import CorruptVaultError, IntegrityError
+from chronolock.model import VaultStatus
 
 
 def _tiny_bury_options(name: str, secret: str) -> vault.BuryOptions:
@@ -113,7 +113,7 @@ class TestTamperingDetected:
         # Load the raw file, flip a byte in the ciphertext field, re-save.
         import json
 
-        with open(path, "r") as fh:
+        with open(path) as fh:
             data = json.load(fh)
         raw = data["encrypted"]["ciphertext"]
         flipped = ("A" if raw[0] == "B" else "B") + raw[1:]
@@ -124,7 +124,7 @@ class TestTamperingDetected:
         with open(path, "w") as fh:
             json.dump(data, fh)
 
-        with pytest.raises(Exception):  # IntegrityError or CorruptVaultError
+        with pytest.raises((IntegrityError, CorruptVaultError)):
             vault.open_vault(vault_store, v.metadata.vault_id)
 
     def test_modified_seed_fails_open(self, vault_store) -> None:
@@ -134,13 +134,13 @@ class TestTamperingDetected:
         import json
 
         path = glob.glob(f"{vault_store.path}/*.vault")[0]
-        with open(path, "r") as fh:
+        with open(path) as fh:
             data = json.load(fh)
         data["seed"] = "A" * len(data["seed"])
         with open(path, "w") as fh:
             json.dump(data, fh)
 
-        with pytest.raises(Exception):
+        with pytest.raises(IntegrityError):
             vault.open_vault(vault_store, v.metadata.vault_id)
 
 

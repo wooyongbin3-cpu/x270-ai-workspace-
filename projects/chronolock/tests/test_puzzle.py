@@ -13,8 +13,6 @@ Assertion strategy:
 
 from __future__ import annotations
 
-from typing import List, Tuple
-
 import pytest
 
 from chronolock import puzzle
@@ -110,7 +108,7 @@ class TestSolveProgress:
         """A large puzzle invokes the callback at least once."""
         spec = puzzle.PuzzleSpec(seed=b"\x00" * 32, difficulty=1000)
 
-        invoked: List[Tuple[int, int]] = []
+        invoked: list[tuple[int, int]] = []
 
         def progress(done: int, total: int) -> None:
             invoked.append((done, total))
@@ -133,7 +131,7 @@ class TestSolveProgress:
     def test_final_progress_matches_total(self) -> None:
         """The final callback has ``done == total``."""
         spec = puzzle.PuzzleSpec(seed=b"\x00" * 32, difficulty=100)
-        final: Tuple[int, int] = (0, 0)
+        final: tuple[int, int] = (0, 0)
 
         def progress(done: int, total: int) -> None:
             nonlocal final

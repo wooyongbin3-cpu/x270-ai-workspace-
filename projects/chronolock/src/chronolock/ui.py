@@ -15,10 +15,12 @@ Policy:
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
-from typing import List, Optional, TextIO
+from typing import TextIO
 
-from .model import VaultMetadata
+from .difficulty import format_estimate
+from .model import VaultMetadata, VaultStatus
 
 
 # ANSI colour codes (kept minimal; full styling is out of scope).
@@ -46,12 +48,15 @@ def enable_colour(stream: TextIO) -> None:
     Args:
         stream: The output stream to test (typically ``sys.stdout``).
     """
-    # TODO(TICKET-007): implement — set _COLOUR_ENABLED appropriately.
-    #   Rules:
-    #     - FORCE_COLOR set (and truthy) -> True
-    #     - NO_COLOR set -> False
-    #     - otherwise -> bool(getattr(stream, "isatty", lambda: False)())
-    raise NotImplementedError
+    global _COLOUR_ENABLED
+    force = os.environ.get("FORCE_COLOR", "")
+    if force and force != "0":
+        _COLOUR_ENABLED = True
+    elif "NO_COLOR" in os.environ:
+        _COLOUR_ENABLED = False
+    else:
+        isatty = getattr(stream, "isatty", None)
+        _COLOUR_ENABLED = bool(isatty()) if callable(isatty) else False
 
 
 def _c(code: str, text: str) -> str:
@@ -76,10 +81,20 @@ def _format_timestamp(ts: int) -> str:
         return f"<unparseable: {ts}>"
 
 
+def _field(label: str, value: str) -> str:
+    """Render one aligned ``label: value`` line."""
+    return f"  {_c(_Colour.DIM, f'{label:<11}')}{value}"
+
+
+def _status_label(status: VaultStatus) -> str:
+    """Colourise a vault status."""
+    colour = _Colour.GREEN if status is VaultStatus.UNLOCKED else _Colour.YELLOW
+    return _c(colour, status.value)
+
+
 def _format_duration(seconds: float) -> str:
     """Format a duration in seconds as a compact human string."""
-    # TODO(TICKET-007): implement — reuse chronolock.difficulty.format_estimate.
-    raise NotImplementedError
+    return format_estimate(seconds)
 
 
 def render_bury_summary(
@@ -101,9 +116,15 @@ def render_bury_summary(
     Returns:
         A multi-line string (with ANSI colours) summarising the vault.
     """
-    # TODO(TICKET-007): implement — compose the boxed summary via _banner
-    #   and _format_timestamp/_format_duration.
-    raise NotImplementedError
+    lines = [
+        _c(_Colour.BOLD, _banner("vault buried")),
+        _field("id", _c(_Colour.CYAN, vault_id)),
+        _field("name", name),
+        _field("unlocks", _format_timestamp(unlock_after)),
+        _field("difficulty", f"{difficulty:,} iterations"),
+        _field("est. solve", f"~{_format_duration(estimated_seconds)} on this machine"),
+    ]
+    return "\n".join(lines)
 
 
 def render_progress_bar(
@@ -125,11 +146,11 @@ def render_progress_bar(
         A string like ``"████▓░░░░░░ 32%"`` (or the plain ASCII fallback when
         colours are disabled).
     """
-    # TODO(TICKET-007): implement —
-    #   frac = clamp(done/total, 0..1); filled = round(frac*width)
-    #   bar = "█"*filled + "░"*(width-filled)
-    #   return f"{bar} {frac*100:.0f}%{label}"
-    raise NotImplementedError
+    frac = min(1.0, max(0.0, done / total)) if total > 0 else 1.0
+    filled = round(frac * width)
+    bar = "█" * filled + "░" * (width - filled)
+    suffix = f" {label}" if label else ""
+    return f"{_c(_Colour.GREEN, bar)} {frac * 100:3.0f}%{suffix}"
 
 
 def render_header(metadata: VaultMetadata) -> str:
@@ -141,12 +162,19 @@ def render_header(metadata: VaultMetadata) -> str:
     Returns:
         A formatted multi-line string describing the vault (no secret).
     """
-    # TODO(TICKET-007): implement — id, name, status, created, unlock,
-    #   difficulty, estimated solve time.
-    raise NotImplementedError
+    lines = [
+        _c(_Colour.BOLD, metadata.name),
+        _field("id", _c(_Colour.CYAN, metadata.vault_id)),
+        _field("status", _status_label(metadata.status)),
+        _field("created", _format_timestamp(metadata.created_at)),
+        _field("unlocks", _format_timestamp(metadata.unlock_after)),
+        _field("difficulty", f"{metadata.difficulty:,} iterations"),
+        _field("format", metadata.solver_version),
+    ]
+    return "\n".join(lines)
 
 
-def render_list(metadatas: List[VaultMetadata], now: int) -> str:
+def render_list(metadatas: list[VaultMetadata], now: int) -> str:
     """Render a table of vaults for ``chronolock list``.
 
     Args:
@@ -156,5 +184,24 @@ def render_list(metadatas: List[VaultMetadata], now: int) -> str:
     Returns:
         A formatted table string with aligned columns and colours.
     """
-    # TODO(TICKET-007): implement — a name/status/opens-in table.
-    raise NotImplementedError
+    if not metadatas:
+        return _c(_Colour.DIM, "no vaults yet — create one with `chronolock bury`")
+    rows = []
+    for md in metadatas:
+        remaining = md.unlock_after - now
+        opens = "now" if remaining <= 0 else f"in {_format_duration(remaining)}"
+        status = "ready" if remaining <= 0 else md.status.value
+        rows.append((md.name, md.vault_id[:8], status, opens))
+    headers = ("NAME", "ID", "STATUS", "OPENS")
+    widths = [max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(headers)]
+
+    def fmt(cells: tuple[str, ...], status_colour: str = "") -> str:
+        padded = [c.ljust(w) for c, w in zip(cells, widths, strict=True)]
+        if status_colour:
+            padded[2] = _c(status_colour, padded[2])
+        return "  ".join(padded).rstrip()
+
+    out = [_c(_Colour.BOLD, fmt(headers))]
+    for row in rows:
+        out.append(fmt(row, _Colour.GREEN if row[2] == "ready" else _Colour.YELLOW))
+    return "\n".join(out)

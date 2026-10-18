@@ -51,28 +51,28 @@ thing to build, demo, and explain.
 
 | | |
 |---|---|
-| MVP implementation | 🚧 In progress — see [`TICKETS.md`](TICKETS.md) |
+| MVP implementation | ✅ All tickets (001–008) implemented — see [`TICKETS.md`](TICKETS.md) |
 | Spec | ✅ [`SPEC.md`](SPEC.md) |
 | Architecture | ✅ [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Roadmap | ✅ [`docs/ROADMAP.md`](docs/ROADMAP.md) |
-| Test suite | ✅ Written (the definition of done) — deliberately red until the tickets are implemented |
+| Test suite | ✅ Green — `make check` (ruff + mypy + pytest) passes |
 
-This repo is structured like a real engineering hand-off: **everything but the
-implementation**. The tests, spec, architecture, and ticket backlog are all
-in place; the `# TODO(TICKET-00X)` markers in `src/chronolock/` are your job.
-See [`AGENTS.md`](AGENTS.md) — it's your onboarding guide.
+The repo started as an engineering hand-off (spec, architecture, tests and a
+ticket backlog); every ticket in [`TICKETS.md`](TICKETS.md) is now implemented
+and the test suite is the regression net. See [`AGENTS.md`](AGENTS.md) for the
+contributor workflow.
 
 ---
 
 ## Install
 
 ```bash
-cd chronolock
+cd projects/chronolock
 python -m venv .venv && source .venv/bin/activate
 make dev-install        # pip install -e ".[dev]"
 ```
 
-Requires **Python 3.9+**. Runtime dependency: [`cryptography`](https://pypi.org/project/cryptography/).
+Requires **Python 3.10+**. Runtime dependency: [`cryptography`](https://pypi.org/project/cryptography/).
 
 ---
 
@@ -151,7 +151,7 @@ chronolock/
 │   ├── difficulty.py     # calibration · hash-rate measurement
 │   ├── ui.py             # terminal rendering
 │   └── cli.py            # CLI entry point & error mapping
-└── tests/                # the spec as code — deliberately failing until implemented
+└── tests/                # the spec as code
     └── test_integration.py   # ⭐ the end-to-end definition of done
 ```
 

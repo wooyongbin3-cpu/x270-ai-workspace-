@@ -14,8 +14,8 @@ Fixture notes:
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Callable, Iterator
 
 import pytest
 

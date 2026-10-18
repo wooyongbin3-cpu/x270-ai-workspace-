@@ -197,6 +197,8 @@ Legend
 
 ## Sprint summary (what all of this adds up to)
 
+> ✅ **All tickets below are done** — `make check` is green.
+
 | Ticket | Area | Prio | Size | Tests to turn green |
 |--------|------|------|------|---------------------|
 | 001 | Scaffolding | — | — | — (shipped) |

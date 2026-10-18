@@ -13,9 +13,7 @@ Covers:
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
-from typing import Any, Callable
 
 import pytest
 
@@ -105,21 +103,24 @@ class TestAtomicity:
         leftovers = list(Path(vault_store.path).glob("*.tmp"))
         assert leftovers == []
 
-    def test_save_replaces_existing(self, vault_store, sample_metadata, sealed_secret) -> None:
-        """Overwriting is atomic: old content is fully replaced."""
-        vault_store.save(sample_metadata, sealed_secret)
-        # Modify the file directly, then re-save; the file must be whole again.
-        path = Path(vault_store.path) / f"{sample_metadata.vault_id}{store.VAULT_EXTENSION}"
-        path.write_text("{broken")
-        vault_store.save(sample_metadata, sealed_secret)
-        loaded = vault_store.load(sample_metadata.vault_id)
-        assert loaded.metadata.vault_id == sample_metadata.vault_id
+    def test_failed_write_leaves_no_partial_file(
+        self, vault_store, sample_metadata, sealed_secret, monkeypatch
+    ) -> None:
+        """If the final rename fails, no vault or temp file is left behind."""
+
+        def boom(src: str, dst: str) -> None:
+            raise OSError("disk full")
+
+        monkeypatch.setattr(store.os, "replace", boom)
+        with pytest.raises(StoreIOError):
+            vault_store.save(sample_metadata, sealed_secret)
+        assert list(Path(vault_store.path).iterdir()) == []
 
 
 class TestCorruption:
     """Malformed vault files must raise the right errors."""
 
-    def _write_raw(self, store_dir: Path, vault_id: str, content: str) -> Path:
+    def _write_raw(self, store_dir: Path, content: str, vault_id: str) -> Path:
         path = store_dir / f"{vault_id}{store.VAULT_EXTENSION}"
         path.write_text(content)
         return path

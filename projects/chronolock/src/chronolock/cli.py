@@ -26,10 +26,17 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from typing import List, Optional, Sequence
+from collections.abc import Callable, Sequence
 
 from . import __version__, difficulty, store, ui, vault
-from .errors import ChronolockError, ConfigError
+from .errors import (
+    ChronolockError,
+    ConfigError,
+    CorruptVaultError,
+    IntegrityError,
+    PuzzleError,
+    VaultNotFoundError,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -54,18 +61,22 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DIR",
         help="Vault store directory (default: OS data dir or $CHRONOLOCK_DIR).",
     )
+    # Also accept ``--dir`` after the subcommand; SUPPRESS keeps a top-level
+    # value from being overwritten by the subparser's default.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--dir", default=argparse.SUPPRESS, metavar="DIR", help=argparse.SUPPRESS)
+
     sub = parser.add_subparsers(dest="command", required=True)
 
     # bury
-    p_bury = sub.add_parser("bury", help="Create a new time-locked vault.")
+    p_bury = sub.add_parser("bury", parents=[common], help="Create a new time-locked vault.")
     p_bury.add_argument("name", help="A short label for the vault.")
     p_bury.add_argument("secret", help="The secret text to seal (use quotes).")
     p_bury.add_argument(
         "--unlock-after",
         type=int,
         metavar="UNIXTS",
-        help="Unix timestamp before which it should not open "
-        "(calibrates difficulty).",
+        help="Unix timestamp before which it should not open (calibrates difficulty).",
     )
     p_bury.add_argument(
         "--duration",
@@ -78,13 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--difficulty",
         type=int,
         metavar="N",
-        help="Explicit puzzle difficulty (hash iterations). Overrides "
-        "calibration.",
+        help="Explicit puzzle difficulty (hash iterations). Overrides calibration.",
     )
     p_bury.set_defaults(func=cmd_bury)
 
     # open
-    p_open = sub.add_parser("open", help="Solve a vault's puzzle and reveal it.")
+    p_open = sub.add_parser("open", parents=[common], help="Solve a vault's puzzle and reveal it.")
     p_open.add_argument("vault_id", help="The vault id to open.")
     p_open.add_argument(
         "--reveal",
@@ -94,12 +104,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_open.set_defaults(func=cmd_open)
 
     # status
-    p_status = sub.add_parser("status", help="Show a vault's public metadata.")
+    p_status = sub.add_parser("status", parents=[common], help="Show a vault's public metadata.")
     p_status.add_argument("vault_id", help="The vault id to inspect.")
     p_status.set_defaults(func=cmd_status)
 
     # list
-    p_list = sub.add_parser("list", help="List all vaults.")
+    p_list = sub.add_parser("list", parents=[common], help="List all vaults.")
     p_list.add_argument(
         "--verbose",
         action="store_true",
@@ -123,6 +133,31 @@ def _build_store(args: argparse.Namespace) -> store.VaultStore:
     return store.VaultStore(directory)
 
 
+def _resolve_id(s: store.VaultStore, ref: str) -> str:
+    """Expand a unique vault-id prefix (as shown by ``list``) to a full id."""
+    ids = s.list_ids()
+    if ref in ids:
+        return ref
+    matches = [vid for vid in ids if vid.startswith(ref)]
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        raise ConfigError(f"ambiguous vault id prefix {ref!r} ({len(matches)} matches)")
+    raise VaultNotFoundError(f"no vault matches {ref!r}", ref)
+
+
+def _progress_printer(label: str) -> Callable[[int, int], None] | None:
+    """Return a callback drawing a live progress bar on stderr (TTY only)."""
+    if not sys.stderr.isatty():
+        return None
+
+    def report(done: int, total: int) -> None:
+        end = "\n" if done >= total else ""
+        print("\r" + ui.render_progress_bar(done, total, label=label), end=end, file=sys.stderr)
+
+    return report
+
+
 def cmd_bury(args: argparse.Namespace) -> int:
     """Run ``chronolock bury``.
 
@@ -132,15 +167,43 @@ def cmd_bury(args: argparse.Namespace) -> int:
     Returns:
         Shell exit code (``0`` on success).
     """
-    # TODO(TICKET-008): implement —
-    #   1. build BuryOptions from args (name, secret, unlock_after/difficulty)
-    #   2. if both --unlock-after and --duration: ConfigError (conflicting)
-    #   3. s = _build_store(args)
-    #   4. result = vault.bury(s, options, progress=...)
-    #      progress callback renders a live progress bar via ui.render_progress_bar
-    #   5. print ui.render_bury_summary(...)
-    #   6. return 0
-    raise NotImplementedError
+    given = [f for f in ("unlock_after", "duration", "difficulty") if getattr(args, f) is not None]
+    if not given:
+        raise ConfigError("one of --unlock-after, --duration or --difficulty is required")
+    if args.unlock_after is not None and args.duration is not None:
+        raise ConfigError("--unlock-after and --duration are mutually exclusive")
+    if args.duration is not None and args.difficulty is not None:
+        raise ConfigError("--duration and --difficulty are mutually exclusive")
+    for flag in ("unlock_after", "duration"):
+        value = getattr(args, flag)
+        if value is not None and value <= 0:
+            raise ConfigError(f"--{flag.replace('_', '-')} must be a positive integer")
+
+    unlock_after = args.unlock_after
+    if args.duration is not None:
+        unlock_after = int(time.time()) + args.duration
+    options = vault.BuryOptions(
+        name=args.name,
+        secret=args.secret,
+        unlock_after=unlock_after,
+        difficulty=args.difficulty,
+    )
+    s = _build_store(args)
+    if any(md.name == args.name for md in vault.list_vaults(s)):
+        raise ConfigError(f"a vault named {args.name!r} already exists")
+
+    buried = vault.bury(s, options, progress=_progress_printer("sealing"))
+    md = buried.metadata
+    print(
+        ui.render_bury_summary(
+            md.vault_id,
+            md.name,
+            md.unlock_after,
+            md.difficulty,
+            md.difficulty / difficulty.measure_hash_rate(),
+        )
+    )
+    return 0
 
 
 def cmd_open(args: argparse.Namespace) -> int:
@@ -152,13 +215,20 @@ def cmd_open(args: argparse.Namespace) -> int:
     Returns:
         Shell exit code (``0`` on success).
     """
-    # TODO(TICKET-008): implement —
-    #   1. s = _build_store(args)
-    #   2. result = vault.open_vault(s, args.vault_id, progress=...)
-    #   3. print header; if args.reveal: print the secret to stdout
-    #   4. print stats (iterations, elapsed, rate)
-    #   5. return 0
-    raise NotImplementedError
+    s = _build_store(args)
+    result = vault.open_vault(
+        s, _resolve_id(s, args.vault_id), progress=_progress_printer("solving")
+    )
+    print(ui.render_header(result.vault.metadata))
+    print(
+        f"  solved {result.iterations:,} iterations in "
+        f"{result.elapsed_seconds:.2f}s ({result.rate:,.0f}/s)"
+    )
+    if args.reveal:
+        print(result.vault.secret)
+    else:
+        print("  (secret hidden — re-run with --reveal to print it)", file=sys.stderr)
+    return 0
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -170,10 +240,9 @@ def cmd_status(args: argparse.Namespace) -> int:
     Returns:
         Shell exit code (``0`` on success).
     """
-    # TODO(TICKET-008): implement —
-    #   s = _build_store(args); md = vault.inspect(s, args.vault_id)
-    #   print(ui.render_header(md)); return 0
-    raise NotImplementedError
+    s = _build_store(args)
+    print(ui.render_header(vault.inspect(s, _resolve_id(s, args.vault_id))))
+    return 0
 
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -185,10 +254,14 @@ def cmd_list(args: argparse.Namespace) -> int:
     Returns:
         Shell exit code (``0`` on success).
     """
-    # TODO(TICKET-008): implement —
-    #   s = _build_store(args); mds = vault.list_vaults(s)
-    #   print(ui.render_list(mds, now=int(time.time()))); return 0
-    raise NotImplementedError
+    s = _build_store(args)
+    print(ui.render_list(vault.list_vaults(s), now=int(time.time())))
+    if args.verbose:
+        good = {md.vault_id for md in vault.list_vaults(s)}
+        for vid in s.list_ids():
+            if vid not in good:
+                print(f"warning: skipped unreadable vault {vid}", file=sys.stderr)
+    return 0
 
 
 def _handle_errors(exc: BaseException) -> int:
@@ -200,19 +273,23 @@ def _handle_errors(exc: BaseException) -> int:
     Returns:
         The exit code corresponding to the failure (``1`` generally).
     """
-    # TODO(TICKET-008): implement —
-    #   if isinstance(exc, ConfigError)     -> "config error: {msg}"       -> exit 1
-    #   if isinstance(exc, VaultNotFoundError)-> "vault not found: {msg}"   -> exit 1
-    #   if isinstance(exc, CorruptVaultError)-> "corrupt vault: {msg}"     -> exit 1
-    #   if isinstance(exc, IntegrityError)   -> "integrity check failed..." -> exit 1
-    #   if isinstance(exc, PuzzleError)      -> "puzzle error: {msg}"       -> exit 1
-    #   if isinstance(exc, ChronolockError)  -> "error: {msg}"              -> exit 1
-    #   else                                  -> unexpected: print repr      -> exit 1
-    #   Write to sys.stderr.
-    raise NotImplementedError
+    prefixes = (
+        (ConfigError, "config error"),
+        (VaultNotFoundError, "vault not found"),
+        (CorruptVaultError, "corrupt vault"),
+        (IntegrityError, "integrity check failed"),
+        (PuzzleError, "puzzle error"),
+        (ChronolockError, "error"),
+    )
+    for exc_type, prefix in prefixes:
+        if isinstance(exc, exc_type):
+            print(f"{prefix}: {exc}", file=sys.stderr)
+            return 1
+    print(f"unexpected error: {exc!r}", file=sys.stderr)
+    return 1
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point.
 
     Args:
@@ -226,7 +303,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     args = parser.parse_args(argv)
     try:
-        return args.func(args)
+        return int(args.func(args))
     except ChronolockError as exc:
         code = _handle_errors(exc)
     except KeyboardInterrupt:

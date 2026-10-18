@@ -10,19 +10,17 @@ This module owns everything about how a vault looks on disk:
 from __future__ import annotations
 
 import base64
-import hashlib
+import contextlib
 import json
 import os
-import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .crypto import EncryptedSecret, compute_hmac
+from .crypto import HMAC_LENGTH, NONCE_LENGTH, TAG_LENGTH, EncryptedSecret
 from .errors import (
     ConfigError,
     CorruptVaultError,
-    MultiVaultError,
     StoreIOError,
     UnknownFormatError,
     VaultExistsError,
@@ -70,8 +68,12 @@ class VaultStore:
         """Return the absolute path of the store directory."""
         return self._directory
 
+    def _vault_path(self, vault_id: str) -> str:
+        """Return the on-disk path of the vault file for ``vault_id``."""
+        return os.path.join(self._directory, f"{vault_id}{VAULT_EXTENSION}")
+
     def save(self, metadata: VaultMetadata, encrypted: EncryptedSecret, seed: bytes = b"") -> None:
-        """Persist a vault to disk atomically.
+        """Persist a new vault to disk atomically.
 
         Args:
             metadata: The vault's public metadata.
@@ -79,33 +81,35 @@ class VaultStore:
             seed: The puzzle seed bytes (stored in plaintext in the header).
 
         Raises:
+            VaultExistsError: If a vault with the same id is already stored.
             StoreIOError: If the underlying filesystem operation fails.
         """
         _validate_metadata(metadata)
         vault_id = metadata.vault_id
-        fpath = os.path.join(self._directory, f"{vault_id}{VAULT_EXTENSION}")
-        metadata_dict = {
-            "vault_id": metadata.vault_id,
-            "name": metadata.name,
-            "created_at": metadata.created_at,
-            "unlock_after": metadata.unlock_after,
-            "ciphertext_len": metadata.ciphertext_len,
-            "status": metadata.status.value,
-            "difficulty": metadata.difficulty,
-            "solver_version": metadata.solver_version,
-        }
+        fpath = self._vault_path(vault_id)
+        if os.path.exists(fpath):
+            raise VaultExistsError(f"vault already exists: {vault_id}")
         vault_dict = {
             "format": FORMAT,
             "version": FORMAT_VERSION,
-            "seed": base64.b64encode(seed).decode("ascii"),
+            "seed": _b64(seed),
             "difficulty": metadata.difficulty,
             "solver_version": metadata.solver_version,
-            "metadata": metadata_dict,
+            "metadata": {
+                "vault_id": metadata.vault_id,
+                "name": metadata.name,
+                "created_at": metadata.created_at,
+                "unlock_after": metadata.unlock_after,
+                "ciphertext_len": metadata.ciphertext_len,
+                "status": metadata.status.value,
+                "difficulty": metadata.difficulty,
+                "solver_version": metadata.solver_version,
+            },
             "encrypted": {
-                "ciphertext": base64.b64encode(encrypted.ciphertext).decode("ascii"),
-                "nonce": base64.b64encode(encrypted.nonce).decode("ascii"),
-                "tag": base64.b64encode(encrypted.tag).decode("ascii"),
-                "hmac": base64.b64encode(encrypted.hmac).decode("ascii"),
+                "ciphertext": _b64(encrypted.ciphertext),
+                "nonce": _b64(encrypted.nonce),
+                "tag": _b64(encrypted.tag),
+                "hmac": _b64(encrypted.hmac),
             },
             "meta": None,
         }
@@ -120,7 +124,31 @@ class VaultStore:
                 os.close(fd)
             os.replace(tmp_path, fpath)
         except OSError as exc:
+            with contextlib.suppress(OSError):
+                os.remove(tmp_path)
             raise StoreIOError(f"failed to save vault {vault_id}", fpath, exc) from exc
+
+    def _read_envelope(self, vault_id: str) -> dict[str, Any]:
+        """Read and parse a vault file, validating its format/version."""
+        fpath = self._vault_path(vault_id)
+        try:
+            with open(fpath, "rb") as fh:
+                raw = fh.read()
+        except FileNotFoundError:
+            raise VaultNotFoundError(f"vault not found: {vault_id}", vault_id) from None
+        except OSError as exc:
+            raise StoreIOError(f"failed to read vault {vault_id}", fpath, exc) from exc
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise CorruptVaultError(f"invalid JSON in vault {vault_id}") from exc
+        if not isinstance(data, dict):
+            raise CorruptVaultError(f"vault {vault_id} is not a JSON object")
+        if data.get("format") != FORMAT or data.get("version") != FORMAT_VERSION:
+            raise UnknownFormatError(
+                f"unknown format/version: {data.get('format')!r} v{data.get('version')}"
+            )
+        return data
 
     def load(self, vault_id: str) -> LoadedVault:
         """Load a vault's metadata and sealed payload from disk.
@@ -137,40 +165,16 @@ class VaultStore:
             UnknownFormatError: If the format/version is not understood.
             StoreIOError: If the underlying filesystem operation fails.
         """
-        fpath = os.path.join(self._directory, f"{vault_id}{VAULT_EXTENSION}")
+        data = self._read_envelope(vault_id)
+        metadata = _parse_metadata(data)
         try:
-            raw = open(fpath, "rb").read()
-        except FileNotFoundError:
-            raise VaultNotFoundError(f"vault not found: {vault_id}", vault_id)
-        except OSError as exc:
-            raise StoreIOError(f"failed to read vault {vault_id}", fpath, exc) from exc
-        try:
-            data = json.loads(raw.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError) as exc:
-            raise CorruptVaultError(f"invalid JSON in vault {vault_id}") from exc
-        if data.get("format") != FORMAT or data.get("version") != FORMAT_VERSION:
-            raise UnknownFormatError(
-                f"unknown format/version: {data.get('format')!r} v{data.get('version')}"
-            )
-        try:
-            meta = data["metadata"]
             enc = data["encrypted"]
-            seed = base64.b64decode(data.get("seed", ""))
-            metadata = VaultMetadata(
-                vault_id=meta["vault_id"],
-                name=meta["name"],
-                created_at=meta["created_at"],
-                unlock_after=meta["unlock_after"],
-                difficulty=meta["difficulty"],
-                ciphertext_len=meta["ciphertext_len"],
-                status=VaultStatus(meta["status"]),
-                solver_version=meta.get("solver_version", SOLVER_VERSION),
-            )
+            seed = _unb64(data.get("seed", ""))
             encrypted = EncryptedSecret(
-                ciphertext=base64.b64decode(enc["ciphertext"]),
-                nonce=base64.b64decode(enc["nonce"]),
-                tag=base64.b64decode(enc["tag"]),
-                hmac=base64.b64decode(enc["hmac"]),
+                ciphertext=_unb64(enc["ciphertext"]),
+                nonce=_unb64(enc["nonce"], NONCE_LENGTH),
+                tag=_unb64(enc["tag"], TAG_LENGTH),
+                hmac=_unb64(enc["hmac"], HMAC_LENGTH),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise CorruptVaultError(f"malformed vault payload: {exc}") from exc
@@ -178,59 +182,62 @@ class VaultStore:
 
     def load_metadata(self, vault_id: str) -> VaultMetadata:
         """Load only a vault's metadata header (no payload decode)."""
-        fpath = os.path.join(self._directory, f"{vault_id}{VAULT_EXTENSION}")
-        try:
-            raw = open(fpath, "rb").read()
-        except FileNotFoundError:
-            raise VaultNotFoundError(f"vault not found: {vault_id}", vault_id)
-        except OSError as exc:
-            raise StoreIOError(f"failed to read vault {vault_id}", fpath, exc) from exc
-        try:
-            data = json.loads(raw.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError) as exc:
-            raise CorruptVaultError(f"invalid JSON in vault {vault_id}") from exc
-        if data.get("format") != FORMAT or data.get("version") != FORMAT_VERSION:
-            raise UnknownFormatError(
-                f"unknown format/version: {data.get('format')!r} v{data.get('version')}"
-            )
-        try:
-            meta = data["metadata"]
-            return VaultMetadata(
-                vault_id=meta["vault_id"],
-                name=meta["name"],
-                created_at=meta["created_at"],
-                unlock_after=meta["unlock_after"],
-                difficulty=meta["difficulty"],
-                ciphertext_len=meta["ciphertext_len"],
-                status=VaultStatus(meta["status"]),
-                solver_version=meta.get("solver_version", SOLVER_VERSION),
-            )
-        except (KeyError, TypeError, ValueError) as exc:
-            raise CorruptVaultError(f"malformed vault header: {exc}") from exc
+        return _parse_metadata(self._read_envelope(vault_id))
 
-    def list_ids(self) -> List[str]:
+    def list_ids(self) -> list[str]:
         """List the vault ids present in the store, sorted."""
         try:
             entries = os.listdir(self._directory)
         except OSError as exc:
             raise StoreIOError("failed to list store directory", self._directory, exc) from exc
-        ids = [
-            name[: -len(VAULT_EXTENSION)]
-            for name in entries
-            if name.endswith(VAULT_EXTENSION)
-        ]
+        ids = [name[: -len(VAULT_EXTENSION)] for name in entries if name.endswith(VAULT_EXTENSION)]
         return sorted(ids)
 
-    def list_metadata(self) -> List[VaultMetadata]:
+    def list_metadata(self) -> list[VaultMetadata]:
         """List metadata for every vault in the store, newest first."""
-        result: List[VaultMetadata] = []
+        result: list[VaultMetadata] = []
         for vid in self.list_ids():
             try:
                 result.append(self.load_metadata(vid))
-            except (CorruptVaultError, UnknownFormatError, VaultNotFoundError):
+            except (CorruptVaultError, VaultNotFoundError):
                 continue
         result.sort(key=lambda m: m.created_at, reverse=True)
         return result
+
+
+def _b64(data: bytes) -> str:
+    """Encode bytes as ASCII base64."""
+    return base64.b64encode(data).decode("ascii")
+
+
+def _unb64(text: str, expected_len: int | None = None) -> bytes:
+    """Strictly decode base64, optionally checking the decoded length.
+
+    Raises:
+        ValueError: On invalid base64 or an unexpected length.
+    """
+    decoded = base64.b64decode(text, validate=True)
+    if expected_len is not None and len(decoded) != expected_len:
+        raise ValueError(f"expected {expected_len} bytes, got {len(decoded)}")
+    return decoded
+
+
+def _parse_metadata(data: dict[str, Any]) -> VaultMetadata:
+    """Build :class:`VaultMetadata` from a parsed vault envelope."""
+    try:
+        meta = data["metadata"]
+        return VaultMetadata(
+            vault_id=meta["vault_id"],
+            name=meta["name"],
+            created_at=meta["created_at"],
+            unlock_after=meta["unlock_after"],
+            difficulty=meta.get("difficulty", data.get("difficulty")),
+            ciphertext_len=meta["ciphertext_len"],
+            status=VaultStatus(meta["status"]),
+            solver_version=meta.get("solver_version", SOLVER_VERSION),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CorruptVaultError(f"malformed vault header: {exc}") from exc
 
 
 def _validate_metadata(metadata: VaultMetadata) -> None:
@@ -262,6 +269,7 @@ def default_store_path() -> str:
         base = os.environ.get("APPDATA", os.path.expanduser("~"))
     elif os.name == "posix":
         import platform
+
         if platform.system() == "Darwin":
             base = os.path.join(os.path.expanduser("~"), "Library", "Application Support")
         else:
@@ -271,7 +279,7 @@ def default_store_path() -> str:
     return os.path.join(base, "chronolock")
 
 
-def generate_vault_id(entropy_source: Optional[Any] = None) -> str:
+def generate_vault_id(entropy_source: Any | None = None) -> str:
     """Generate a unique vault id (hex, 32 chars)."""
     src = entropy_source if entropy_source is not None else uuid.uuid4
     return src().hex

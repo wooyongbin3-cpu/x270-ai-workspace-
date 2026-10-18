@@ -10,27 +10,26 @@ Public API overview:
     - ``open_vault(...)``                 — solve the puzzle and reveal the secret
     - ``list_vaults(...)`` / ``status``   — inspect the vault store
 
-.. warning::
-    This package is under active development. The public API is stable in
-    shape but every primitive is still a TODO skeleton — see ``AGENTS.md``
-    and ``TICKETS.md`` for the implementation plan.
+.. note::
+    Pre-alpha (0.1). All MVP tickets in ``TICKETS.md`` are implemented; the
+    on-disk format may still change before 1.0.
 """
 
 from __future__ import annotations
 
-from . import errors, puzzle, crypto, vault, store, difficulty, ui  # noqa: F401
-from .model import VaultMetadata, Vault, UnlockResult, VaultStatus  # noqa: F401
+from . import crypto, difficulty, errors, puzzle, store, ui, vault  # noqa: F401
 from .errors import (  # noqa: F401
     ChronolockError,
-    VaultNotFoundError,
-    VaultExistsError,
-    CorruptVaultError,
-    UnknownFormatError,
-    IntegrityError,
-    PuzzleError,
-    InvalidSecretError,
     ConfigError,
+    CorruptVaultError,
+    IntegrityError,
+    InvalidSecretError,
+    PuzzleError,
+    UnknownFormatError,
+    VaultExistsError,
+    VaultNotFoundError,
 )
+from .model import UnlockResult, Vault, VaultMetadata, VaultStatus  # noqa: F401
 
 __version__ = "0.1.0"
 

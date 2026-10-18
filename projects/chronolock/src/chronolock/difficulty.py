@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 #: Number of hash iterations used in the benchmark sample.
 BENCH_SAMPLE = 200_000
@@ -42,7 +42,7 @@ HashRateFn = Callable[[int], float]
 SnapFn = Callable[[int], int]
 
 #: Cached hash rate measured on first call.
-_CACHED_RATE: Optional[float] = None
+_CACHED_RATE: float | None = None
 
 #: Cached number of samples used in the last benchmark.
 _CACHED_SAMPLES: int = 0
@@ -95,8 +95,8 @@ def measure_hash_rate(samples: int = BENCH_SAMPLE) -> float:
 
 def seconds_to_difficulty(
     desired_seconds: float,
-    hash_rate: Optional[float] = None,
-    snap: Optional[SnapFn] = None,
+    hash_rate: float | None = None,
+    snap: SnapFn | None = None,
 ) -> int:
     """Convert a desired wall-clock duration into puzzle difficulty.
 
@@ -116,7 +116,8 @@ def seconds_to_difficulty(
     Raises:
         ValueError: If ``desired_seconds`` is not positive.
     """
-    from .puzzle import MIN_DIFFICULTY, MAX_DIFFICULTY
+    from .puzzle import MAX_DIFFICULTY, MIN_DIFFICULTY
+
     if desired_seconds <= 0:
         raise ValueError("desired_seconds must be positive")
     rate = hash_rate if hash_rate is not None else measure_hash_rate(1000)

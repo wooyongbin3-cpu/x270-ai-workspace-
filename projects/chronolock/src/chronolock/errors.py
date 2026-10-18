@@ -14,8 +14,6 @@ Design notes:
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 
 class ChronolockError(Exception):
     """Base class for all Chronolock errors.
@@ -45,7 +43,7 @@ class VaultNotFoundError(ChronolockError):
             the lookup was attempted by name and no match was found.
     """
 
-    def __init__(self, message: str, vault_id: Optional[str] = None) -> None:
+    def __init__(self, message: str, vault_id: str | None = None) -> None:
         super().__init__(message)
         self.vault_id = vault_id
 
@@ -125,6 +123,6 @@ class MultiVaultError(ChronolockError):
             that failed.
     """
 
-    def __init__(self, message: str, errors: List["tuple[str, str]"]) -> None:
+    def __init__(self, message: str, errors: list[tuple[str, str]]) -> None:
         super().__init__(message)
         self.errors = errors

@@ -126,21 +126,15 @@ class TestComputeHmac:
 
     def test_deterministic(self) -> None:
         """Same key + data → same digest."""
-        assert crypto.compute_hmac(b"\x01" * 32, b"x") == crypto.compute_hmac(
-            b"\x01" * 32, b"x"
-        )
+        assert crypto.compute_hmac(b"\x01" * 32, b"x") == crypto.compute_hmac(b"\x01" * 32, b"x")
 
     def test_data_sensitive(self) -> None:
         """Different data → different digest."""
-        assert crypto.compute_hmac(b"\x01" * 32, b"x") != crypto.compute_hmac(
-            b"\x01" * 32, b"y"
-        )
+        assert crypto.compute_hmac(b"\x01" * 32, b"x") != crypto.compute_hmac(b"\x01" * 32, b"y")
 
     def test_key_sensitive(self) -> None:
         """Different key → different digest."""
-        assert crypto.compute_hmac(b"\x01" * 32, b"x") != crypto.compute_hmac(
-            b"\x02" * 32, b"x"
-        )
+        assert crypto.compute_hmac(b"\x01" * 32, b"x") != crypto.compute_hmac(b"\x02" * 32, b"x")
 
 
 class TestSecretValidation:

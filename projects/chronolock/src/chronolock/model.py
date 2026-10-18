@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class VaultStatus(str, Enum):
@@ -86,7 +85,7 @@ class Vault:
     """
 
     metadata: VaultMetadata
-    secret: Optional[str] = field(default=None)
+    secret: str | None = field(default=None)
 
 
 @dataclass(frozen=True)

@@ -11,9 +11,7 @@ library). These tests focus on the parts the CLI owns:
 
 from __future__ import annotations
 
-import sys
 from types import SimpleNamespace
-from typing import List
 
 import pytest
 
@@ -130,14 +128,14 @@ class TestMainDispatch:
 
     def test_bury_dispatches(self, monkeypatch) -> None:
         """``main([...])`` calls ``cmd_bury`` and returns its code."""
-        calls: List[str] = []
+        calls: list[str] = []
 
         def fake_cmd_bury(args: SimpleNamespace) -> int:
             calls.append("bury")
             return 0
 
         monkeypatch.setattr(cli, "cmd_bury", fake_cmd_bury)
-        monkeypatch.setattr(cli, "ui", type("U", (), {"enable_colour": lambda s: None})())
+        monkeypatch.setattr(cli.ui, "enable_colour", lambda stream: None)
         code = cli.main(["bury", "n", "s"])
         assert code == 0
         assert calls == ["bury"]
