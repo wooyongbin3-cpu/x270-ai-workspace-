@@ -2,7 +2,7 @@
   "name": "生命时钟 · Life Clock",
   "short_name": "Life Clock",
   "description": "从出生那一刻起，温柔地丈量已经走过的岁月。精美本地单页，设置自动缓存。",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f6f1ea",
   "theme_color": "#c45c26",
@@ -29,9 +29,11 @@
       "form_factor": "narrow"
     }
   ],
-  "categories": ["lifestyle", "productivity"],
-  "screenshots_wide": [],
-  "scope": "/",
+  "categories": [
+    "lifestyle",
+    "productivity"
+  ],
+  "scope": "./",
   "lang": "zh-CN",
   "dir": "ltr"
 }

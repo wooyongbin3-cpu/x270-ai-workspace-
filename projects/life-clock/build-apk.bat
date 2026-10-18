@@ -25,7 +25,7 @@ echo.
 
 REM 同步最新代码
 echo 📱 同步最新代码到 Android 项目...
-call npx cap sync android
+call npm run sync
 if errorlevel 1 (
     echo ❌ 同步失败
     pause

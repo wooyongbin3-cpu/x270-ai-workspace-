@@ -14,7 +14,7 @@
 - [x] PWA Manifest + Service Worker
 - [x] GitHub repo：`wooyongbin3-cpu/life-clock`
 - [x] JDK 21 本机构建环境可用
-- [x] `assembleDebug` 成功，`app-debug.apk` 在仓库根目录
+- [x] `assembleDebug` 成功（APK 为本地产物，已 gitignore，发布到 GitHub Releases）
 - [x] **120Hz 高刷请求**（`MainActivity` Display Mode）
 - [x] **RAF 流畅更新**（毫秒秒 + 无拖影进度环 + DOM 脏检查）
 - [x] 文档备份目录 `docs/` + README 更新
@@ -34,8 +34,7 @@
 ```powershell
 cd "C:\Users\TUF GAMING\life-clock"
 # 确保 JAVA_HOME 指向 JDK 17+
-Copy-Item -Force index.html dist\index.html
-npx cap sync android
+npm run sync   # = npm run build + npx cap sync android
 cd android
 .\gradlew.bat assembleDebug
 Copy-Item -Force app\build\outputs\apk\debug\app-debug.apk ..\app-debug.apk
@@ -61,8 +60,8 @@ gh release create v1.2.0 `
 | **README.md** | 主说明 |
 | **README_AGENT.md** | Agent 速读 |
 | **RELEASE_NOTES.md** | 版本说明 |
-| **FREE_RELEASE_QUICKSTART.md** | 免费发布 |
-| **GITHUB_RELEASE_GUIDE.md** | Release 详解 |
+| **docs/FREE_RELEASE_QUICKSTART.md** | 免费发布 |
+| **docs/GITHUB_RELEASE_GUIDE.md** | Release 详解 |
 
 ---
 
@@ -70,9 +69,8 @@ gh release create v1.2.0 `
 
 ```text
 life-clock/
-├── index.html / dist/
+├── index.html               # 源文件；dist/ 由 npm run build 生成
 ├── android/                 # Capacitor
-├── app-debug.apk            # 当前调试包
 ├── docs/                    # 备份资料目录
 └── tests/
 ```

@@ -35,9 +35,8 @@ Who:  无后端；数据仅 localStorage
 
 ```text
 index.html                                              # 主应用
-dist/index.html                                         # 同步副本
+scripts/build.mjs                                       # 生成 dist/（构建产物，不入库）
 android/.../MainActivity.java                           # 120Hz / WebView GPU
-app-debug.apk                                           # 调试包备份
 docs/backup/SESSION_2026-07-16_120hz.md                 # 本 session 备份
 HANDOFF.md                                              # 交接
 ```
@@ -63,8 +62,7 @@ HANDOFF.md                                              # 交接
 
 ```powershell
 cd life-clock
-Copy-Item -Force index.html dist\index.html
-npx cap sync android
+npm run sync   # = npm run build + npx cap sync android
 cd android; .\gradlew.bat assembleDebug
 ```
 

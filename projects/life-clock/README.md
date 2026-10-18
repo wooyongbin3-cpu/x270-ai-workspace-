@@ -33,8 +33,8 @@
 ### 网页版
 
 ```bash
-git clone https://github.com/wooyongbin3-cpu/life-clock.git
-cd life-clock
+git clone https://github.com/wooyongbin3-cpu/x270-ai-workspace-.git
+cd x270-ai-workspace-/projects/life-clock
 ```
 
 直接用浏览器打开 `index.html`，或：
@@ -48,7 +48,7 @@ python -m http.server 5500
 
 ### Android APK
 
-1. 下载仓库根目录的 [`app-debug.apk`](app-debug.apk)，或从 [GitHub Releases](https://github.com/wooyongbin3-cpu/life-clock/releases) 获取  
+1. 从 [GitHub Releases](https://github.com/wooyongbin3-cpu/life-clock/releases) 下载 `app-debug.apk`（APK 不再提交进 git，见下方「开发与构建」自行构建）  
 2. 在手机上允许「未知来源」安装  
 3. 安装后打开，输入出生日期即可  
 
@@ -71,7 +71,8 @@ adb install app-debug.apk
 ```bash
 npm install
 npm test                 # 体积 / 缓存 / 时间计算校验
-npm run sync             # npx cap sync android
+npm run build            # 复制 Web 文件到 dist/（dist/ 为构建产物，不入库）
+npm run sync             # build + npx cap sync android
 cd android
 .\gradlew.bat assembleDebug
 # 输出: android/app/build/outputs/apk/debug/app-debug.apk
@@ -101,17 +102,17 @@ npm run test:browser     # 可选：Playwright 冒烟
 ```text
 life-clock/
 ├── index.html                 # 主应用（HTML + CSS + JS）
-├── dist/                      # 同步到 Android 的 Web 资源
+├── dist/                      # 构建产物（npm run build 生成，已 gitignore）
 ├── android/                   # Capacitor Android 工程
-├── app-debug.apk              # 调试版 APK（备份产物）
 ├── assets/ornament.svg
-├── docs/                      # 文档索引与 session 备份
+├── docs/                      # 发布指南、文档索引与 session 备份
 │   ├── README.md
+│   ├── FREE_RELEASE_QUICKSTART.md / GITHUB_RELEASE_GUIDE.md
+│   ├── GOOGLE_PLAY_GUIDE.md / AFTER_ANDROID_STUDIO.md
 │   └── backup/
+├── scripts/build.mjs          # 生成 dist/
 ├── tests/                     # 校验脚本
 ├── HANDOFF.md / README_AGENT.md / RELEASE_NOTES.md
-├── FREE_RELEASE_QUICKSTART.md / GITHUB_RELEASE_GUIDE.md
-├── GOOGLE_PLAY_GUIDE.md / AFTER_ANDROID_STUDIO.md
 ├── package.json
 └── scripts/bootstrap-github.ps1
 ```
@@ -132,8 +133,8 @@ life-clock/
 
 - **GitHub Pages**：Settings → Pages → `main` / root  
 - Netlify / Vercel / Cloudflare Pages：导入本仓库  
-- **免费分发 APK**：见 [FREE_RELEASE_QUICKSTART.md](FREE_RELEASE_QUICKSTART.md)  
-- **Play 商店（可选）**：见 [GOOGLE_PLAY_GUIDE.md](GOOGLE_PLAY_GUIDE.md)
+- **免费分发 APK**：见 [FREE_RELEASE_QUICKSTART.md](docs/FREE_RELEASE_QUICKSTART.md)  
+- **Play 商店（可选）**：见 [GOOGLE_PLAY_GUIDE.md](docs/GOOGLE_PLAY_GUIDE.md)
 
 ## License
 

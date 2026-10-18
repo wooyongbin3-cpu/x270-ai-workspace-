@@ -1,64 +1,55 @@
-// Service Worker for Life Clock
-// Provides offline support and caching
-
-const CACHE_NAME = 'life-clock-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
+// Service Worker for Life Clock — offline support.
+// Bump CACHE_VERSION whenever the precache list changes.
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `life-clock-${CACHE_VERSION}`;
+// Relative URLs so the app also works when served from a sub-path.
+const PRECACHE = ['./', 'index.html', 'manifest.json', 'assets/ornament.svg'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
-    })
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then((names) =>
+      Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)))
+    )
   );
   self.clients.claim();
 });
 
+function putInCache(request, response) {
+  if (response && response.status === 200 && response.type === 'basic') {
+    const copy = response.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+  }
+  return response;
+}
+
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests and API calls
-  if (!event.request.url.startsWith(self.location.origin)) {
+  const { request } = event;
+  if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  // For GET requests, use cache first strategy
-  if (event.request.method === 'GET') {
+  // Pages: network first so updates ship immediately; fall back to cache offline.
+  if (request.mode === 'navigate') {
     event.respondWith(
-      caches.match(event.request).then((response) => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request).then((response) => {
-          // Don't cache non-successful responses
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-          return response;
-        }).catch(() => {
-          return caches.match('/index.html');
-        });
-      })
+      fetch(request)
+        .then((response) => putInCache(request, response))
+        .catch(() => caches.match(request).then((hit) => hit || caches.match('index.html')))
     );
+    return;
   }
+
+  // Other assets: stale-while-revalidate.
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      const network = fetch(request)
+        .then((response) => putInCache(request, response))
+        .catch(() => cached);
+      return cached || network;
+    })
+  );
 });

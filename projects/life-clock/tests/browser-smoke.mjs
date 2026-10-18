@@ -48,7 +48,7 @@ async function main() {
   let serverWrap;
   try {
     serverWrap = await startServer();
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || undefined });
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
     const errors = [];
