@@ -1,0 +1,19 @@
+{
+  "name": "swiftdl-pro",
+  "version": "1.1.0",
+  "description": "速途下载器 - SwiftDL Pro | A modern download manager",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "author": "SwiftDL Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^43.2.0"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

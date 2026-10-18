@@ -1,0 +1,10 @@
+# Runtime dependencies
+cryptography>=42.0
+
+# Development dependencies (also available via: pip install -e ".[dev]")
+pytest>=7.4
+pytest-cov>=4.1
+pytest-mock>=3.12
+tox>=4.11
+mypy>=1.8
+ruff>=0.3

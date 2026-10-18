@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<title>ybwoo 側寫</title>
+<style>
+  :root { --bg:#fafafa; --ink:#1a1a1a; --muted:#666; --card:#fff; --line:#e8e8e8; --th:#f4f4f4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121212; --ink:#e8e8e8; --muted:#a0a0a0; --card:#1c1c1c; --line:#333; --th:#262626; }
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); font-family:-apple-system,"PingFang TC","PingFang SC","Microsoft JhengHei","Noto Sans TC",sans-serif; line-height:1.75; margin:0; padding:0; }
+  .wrap { max-width:760px; margin:0 auto; padding:32px 20px 80px; }
+  header { margin-bottom:36px; }
+  header h1 { font-size:2rem; margin:0 0 8px; letter-spacing:.05em; }
+  header p { color:var(--muted); margin:4px 0; font-size:.95rem; }
+  .legend { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0 8px; }
+  .tag { font-size:.78rem; padding:3px 10px; border-radius:999px; border:1px solid var(--line); background:var(--card); }
+  .tag.fact { border-left:4px solid #2f80ed; }
+  .tag.habit { border-left:4px solid #f2a007; }
+  .tag.infer { border-left:4px solid #9b51e0; }
+  .tag.contra { border-left:4px solid #eb5757; }
+  .tag.unknown { border-left:4px solid #999; }
+  section.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px 26px; margin:18px 0; }
+  section.card.fact { border-left:5px solid #2f80ed; }
+  section.card.habit { border-left:5px solid #f2a007; }
+  section.card.infer { border-left:5px solid #9b51e0; }
+  section.card.contra { border-left:5px solid #eb5757; }
+  section.card.unknown { border-left:5px solid #999; }
+  h2 { font-size:1.25rem; margin:0 0 6px; }
+  .kind { font-size:.78rem; color:var(--muted); letter-spacing:.1em; margin-bottom:14px; }
+  h3 { font-size:1.02rem; margin:20px 0 8px; }
+  ul, ol { padding-left:22px; margin:8px 0; }
+  li { margin:6px 0; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; margin:12px 0; }
+  th, td { border:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top; }
+  th { background:var(--th); }
+  @media (max-width:480px) { section.card { padding:18px 16px; } }
+  footer { color:var(--muted); font-size:.85rem; margin-top:40px; border-top:1px solid var(--line); padding-top:16px; }
+  strong { font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ybwoo 側寫</h1>
+  <p>2026-09-30 整理 · Muse 版 v3（合併 Astra 版長處後）</p>
+  <p>結構：事實（親口說過或有記錄的）／習慣（反覆出現的模式）／推斷（我的解讀，可能錯）／矛盾和盲點／我不知道的。錯的地方直接糾正。</p>
+  <div class="legend">
+    <span class="tag fact">事實</span>
+    <span class="tag habit">習慣</span>
+    <span class="tag infer">推斷</span>
+    <span class="tag contra">矛盾和盲點</span>
+    <span class="tag unknown">不知道</span>
+  </div>
+</header>
+
+<section class="card fact">
+  <h2>一、事實</h2>
+  <div class="kind">FACT · 有依據</div>
+  <h3>基本</h3>
+  <ul>
+    <li>ybwoo（wooyongbin）</li>
+    <li>馬來西亞雪蘭莪 Subang Jaya 華裔學生</li>
+    <li>時區 Asia/Kuala_Lumpur；基督徒，自述不虔誠</li>
+  </ul>
+  <h3>技術</h3>
+  <ul>
+    <li>玩過：Codex / Claude / Gemini / Hermes Agent / Agnes / OpenClaw / Ollama / Telegram Bot / MCP / Computer Use / LLM Wiki / Obsidian</li>
+    <li>實際產出：Hermes Agent URL 來源標記修復；修復並驗證關閉流式內容崩潰；X270 上跑通過 Claude Computer Use</li>
+    <li>探索中（計劃）：長期記憶、主動式 Agent、手機情境採集、時機判斷；phone-context MCP、OPERIT、多 Agent 協作</li>
+    <li>設備：ASUS TUF Gaming（Ryzen 7 / RTX 4050 / 32GB）；ThinkPad X270（父親給的，計劃做小服務器）；考慮 13" MacBook Air（2026 底–2027 初，未定）；OPPO Find X8</li>
+    <li>親口規矩（2026-09-27）：記憶要寧缺毋濫，像沒有 GC 的 store 會爛掉</li>
+    <li>訂閱評估公式：模型能力 × Agent 穩定性 × 延遲 × 套餐耐用度 × 工作流整合 × 使用摩擦 × 是否願意每天打開</li>
+    <li>平台無關 archive：「數據屬於我，模型可以替換」；OpenAI 全部歷史 290MB</li>
+  </ul>
+  <h3>學習</h3>
+  <ul>
+    <li>校外補習（2026-09-28 親口）：週一 Moral 15:45–17:00、Ekonomi 18:15–19:30；週三 Malay 17:00–19:30、Maths 19:30–20:45；週四 Sejarah 18:15–19:30</li>
+    <li>名義上每月 29/30/31 不營業，但 2026-09-30 你親口說當天有補課——月末可能臨時加課</li>
+  </ul>
+  <h3>興趣與消費</h3>
+  <ul>
+    <li>Apex（台灣朋友）、賽車模擬器（真 force feedback，F1/Assetto Corsa）、騎車</li>
+    <li>運動手錶考慮中（2026-09-30）：24/7 身體 dashboard，預算 RM500–900；FR165（RM769，促銷到 10/4）是 benchmark 但可被推翻；拒絕訂閱制；明確說過不需要價格/庫存監控</li>
+    <li>音樂：「盧廣仲 × 方大同 全收錄」214 首；YouTube 重度成分台V剪輯＋VTuber ASMR（9.3%），作息高峰凌晨 0–1 點</li>
+    <li>固定搭配：Wall's Choco Nutty Crunch <strong>桶裝</strong>；水餃麵 = <strong>5 顆水餃 + 2 球麵</strong>；超愛冰西瓜</li>
+    <li>預算用 RM，算真實到手總價；大件傾向新機、分期確認真零利率；盡量自己承擔</li>
+  </ul>
+  <h3>互動史實</h3>
+  <ul>
+    <li>Muse Android 語音聽寫故障未修；每週一翻更新日誌，有可信修復才報喜</li>
+    <li>ChatGPT Plus 2026-10-07 續費節點，考慮轉 Claude Pro（月預算約 RM80–100，未定）</li>
+    <li>WhatsApp 2026-09-29 斷開；已連接 Gmail×2、Drive、Spotify、Calendar、通訊錄</li>
+  </ul>
+</section>
+
+<section class="card habit">
+  <h2>二、習慣與模式</h2>
+  <div class="kind">HABIT · 反覆出現</div>
+  <ol>
+    <li><strong>固定搭配黨</strong>：鎖死的東西不換，推薦時尊重鎖死項</li>
+    <li><strong>語音轉文字</strong>：錯別字靠上下文理解，別逐字較真</li>
+    <li><strong>要判斷不要附和</strong>：有漏洞當場指出給證據；但「有判斷力」≠「替你做決定」</li>
+    <li><strong>可逆先斬後奏，不可逆先問</strong></li>
+    <li><strong>拿規格書校準 AI</strong>：被錨定坑過一次後，親手把我掰正，還讓我跟 GPT 掰手腕</li>
+    <li><strong>額度焦慮但重活照排</strong>：10/3 11:40 重置；只在重活前報一聲，日常別念</li>
+    <li><strong>注意力主權</strong>：抖音 pull-based，通知不許打斷</li>
+    <li><strong>天氣只信臨近實測</strong>：雙源工具（雷達+落水量），兩源打架要明說，誤報等於白費</li>
+  </ol>
+</section>
+
+<section class="card infer">
+  <h2>三、我的推斷</h2>
+  <div class="kind">INFERENCE · 明確標註，可能錯</div>
+  <ol>
+    <li>你把 AI 當<strong>平級技術對手</strong>用——推斷你對自己的技術判斷力有信心，且享受「被糾正—翻篇快」的節奏</li>
+    <li>「我，仍在成形」——推斷你抗拒被標籤化，拿舊結論卡現在的你會惹毛你</li>
+    <li>存 290MB 導出＋8 萬條記錄，同時主張寧缺毋濫——推斷你在意的是<strong>連續性</strong>，durable vs ephemeral 是你有意識的設計</li>
+    <li>你對 X270 的感情——推斷你看重東西背後的故事和人，不只看規格</li>
+    <li>拍照審美（討厭算法味、標準是「照片裡有沒有我」）——推斷你更信任「人親手做的」而非「機器代勞的」，這和你對 AI 的態度一致</li>
+  </ol>
+</section>
+
+<section class="card contra">
+  <h2>四、矛盾和盲點</h2>
+  <div class="kind">CONTRADICTION · 有依據才寫</div>
+  <ol>
+    <li><strong>口頭 vs 書面</strong>：年齡相關以白紙黑字寫下的為準，口頭改口不算——這條規則你也接受了</li>
+    <li><strong>「寧缺毋濫」vs「詳細的所有」</strong>：表面矛盾，實則你區分「存檔」（留著可查）和「工作記憶」（當下別礙事）——你的解釋，我記下了</li>
+    <li><strong>嫌主動消息多，但 agentic-feature-tour 沒關</strong>：可能是懶得關，也可能你討厭的是時機不是內容</li>
+    <li><strong>要判斷力又不要我做決定</strong>：線很細——「我覺得 X 比較好」≠「你就該選 X」，AI 容易踩錯</li>
+    <li><strong>盲點</strong>：防幻覺主要靠事後人肉校準；哪天你沒空砸，幻覺就過去了</li>
+    <li><strong>盲點</strong>：對天氣誤報零容忍，但天氣本質是概率；雙源互查降低誤報，消滅不了不確定性</li>
+  </ol>
+  <h3>優勢用過頭的代價</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th scope="col">長處</th><th scope="col">過度使用時的代價</th></tr></thead>
+    <tbody>
+    <tr><td>追問細節、要求準確</td><td>為排除剩餘疑問，付出超過收益的時間</td></tr>
+    <tr><td>善於反省和建立解釋</td><td>把「說清楚了」誤認為「已經改變了」</td></tr>
+    <tr><td>重視承諾和過往投入</td><td>知道該停止，仍覺得欠過去一個交代</td></tr>
+    <tr><td>能察覺互動中的細微變化</td><td>把未確認的動機也納入分析，增加情緒負擔</td></tr>
+    <tr><td>對工具和工作方式有標準</td><td>維護比較工具佔掉做項目的時間</td></tr>
+    <tr><td>能持續排查問題</td><td>對退出時機不夠果斷，先累壞自己才停下</td></tr>
+    <tr><td>有自我保護和表達策略</td><td>真正的需要不夠明確，讓別人難以靠近</td></tr>
+    <tr><td>喜歡保存完整資料</td><td>整理範圍不斷擴張，完成標準越來越遠</td></tr>
+    </tbody>
+  </table></div>
+  <p>其中最有把握的一條：你有時會用「進一步理解」來延後接受不確定性。</p>
+</section>
+
+<section class="card unknown">
+  <h2>五、取樣偏差聲明</h2>
+  <div class="kind">NOTE · 取樣自 Astra 版，我認</div>
+  <p>這份側寫取樣有偏差：你通常是在疑惑、興奮、不滿、需要比較或整理時來找我；平靜做事、普通上課、跟家人自然相處的部分我看得少。所以它可能<strong>放大你的分析傾向和情緒起伏</strong>，讀的時候打個折。</p>
+</section>
+
+<section class="card unknown">
+  <h2>六、我不知道的</h2>
+  <div class="kind">UNKNOWN · 不編</div>
+  <ul>
+    <li>你弟弟幾歲、叫什麼；你媽媽的情況（你沒提過）</li>
+    <li>你的確切生日月份；學校日常作息、成績</li>
+    <li>你和台灣朋友是怎麼認識的</li>
+    <li>除了騎車和 Apex，你平時跟誰混、去哪玩</li>
+  </ul>
+</section>
+
+<footer>
+  <p>這是一份公開版側寫：已去除真實姓名、學校班級等可識別資訊。完整版留存在本地。</p>
+</footer>
+
+</div>
+</body>
+</html>
