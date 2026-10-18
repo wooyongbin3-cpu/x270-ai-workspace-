@@ -1,8 +1,8 @@
 ---
-name: Bug report
+name: "chronolock: Bug report"
 about: Something is wrong or unexpected.
-title: "[BUG] <short summary>"
-labels: ["bug"]
+title: "[chronolock][BUG] <short summary>"
+labels: ["bug", "chronolock"]
 assignees: []
 ---
 

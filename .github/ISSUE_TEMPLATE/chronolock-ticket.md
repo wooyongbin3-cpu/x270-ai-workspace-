@@ -1,8 +1,8 @@
 ---
-name: Ticket (TICKET-XXX)
+name: "chronolock: Ticket (TICKET-XXX)"
 about: A scoped unit of implementation work with acceptance criteria.
 title: "TICKET-XXX: <short summary>"
-labels: ["ticket", "good-first-issue"]
+labels: ["ticket", "chronolock"]
 assignees: []
 ---
 

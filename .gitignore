@@ -1,0 +1,13 @@
+# Shared ignores; each project keeps its own .gitignore for specifics.
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.log
+*.apk
+*.aab

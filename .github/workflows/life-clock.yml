@@ -1,0 +1,23 @@
+name: life-clock
+
+on:
+  push:
+    branches: [main]
+    paths: ["projects/life-clock/**", ".github/workflows/life-clock.yml"]
+  pull_request:
+    paths: ["projects/life-clock/**", ".github/workflows/life-clock.yml"]
+
+defaults:
+  run:
+    working-directory: projects/life-clock
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Static checks + time-math tests; needs no npm install.
+      - run: npm test

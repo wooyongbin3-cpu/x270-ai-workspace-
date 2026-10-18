@@ -84,7 +84,7 @@ make check                  # all three at once
 
 1. **Pick up a ticket** from `TICKETS.md` (work in order; they build on each
    other). Optionally open it as a GitHub issue using the templates in
-   `.github/ISSUE_TEMPLATE/`.
+   the repository root `.github/ISSUE_TEMPLATE/` (`chronolock-*.md`).
 2. **Create a feature branch** named `ticket/00X-short-slug`.
 3. **Implement** the `TODO` markers in the linked module(s).
 4. **Run the ticket's tests** — they must all pass. Then run the *whole* suite

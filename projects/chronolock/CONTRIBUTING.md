@@ -97,7 +97,7 @@ explain your design.
 
 ## 7. Asking for help
 
-Open an issue using the template in `.github/ISSUE_TEMPLATE/`. Good questions
+Open an issue using the template in the repository root `.github/ISSUE_TEMPLATE/` (`chronolock-*.md`). Good questions
 are specific and reference the spec/architecture line you're unsure about —
 e.g. *"SPEC §5.3 says HMAC before decrypt; I'm in `crypto.decrypt` — should the
 HMAC mismatch raise `IntegrityError` and skip the AES call entirely?"*

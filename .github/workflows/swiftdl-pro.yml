@@ -1,0 +1,25 @@
+name: swiftdl-pro
+
+on:
+  push:
+    branches: [main]
+    paths: ["projects/swiftdl-pro/**", ".github/workflows/swiftdl-pro.yml"]
+  pull_request:
+    paths: ["projects/swiftdl-pro/**", ".github/workflows/swiftdl-pro.yml"]
+
+defaults:
+  run:
+    working-directory: projects/swiftdl-pro
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The download engine only uses Node built-ins, so Electron is not installed.
+      - run: npm test
+      - name: Syntax-check main and renderer scripts
+        run: for f in src/main/*.js src/renderer/*.js; do node --check "$f"; done
