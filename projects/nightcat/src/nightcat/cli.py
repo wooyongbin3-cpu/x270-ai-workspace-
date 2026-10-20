@@ -109,6 +109,11 @@ def cmd_init(args: argparse.Namespace) -> int:
     path.write_text(text, encoding="utf-8")
     print(f"✅ 已建立設定檔：{path}")
     print(f"   偵測到：{found.describe()}")
+    if not found.batteries:
+        print("   💡 沒有可用的電池：停電時會直接關機，電來之後「開機時間」檢查會告訴你停了多久。")
+        print(
+            "      BIOS 裡如果有「通電自動開機」（ThinkPad 叫 Power On with AC Attach），記得打開。"
+        )
     print()
     print("下一步：")
     print("  1. 打開設定檔，填好 [telegram] 的 chat_id，")

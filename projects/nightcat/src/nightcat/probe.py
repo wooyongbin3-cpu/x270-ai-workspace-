@@ -6,6 +6,7 @@ import json
 import socket
 from dataclasses import dataclass, field
 
+from .checks.battery import is_dead
 from .host import Host
 
 
@@ -14,13 +15,20 @@ class Findings:
     mounts: list[str] = field(default_factory=list)
     sensors: int = 0
     batteries: list[str] = field(default_factory=list)
+    # 系統看得到、但已經沒用的電池（健康度很低或充不進電）
+    dead_batteries: list[str] = field(default_factory=list)
     systemd: bool = False
     ssh: bool = False
 
     def describe(self) -> str:
         parts = [f"{len(self.mounts)} 個磁碟（{', '.join(self.mounts)}）"]
         parts.append(f"{self.sensors} 個溫度感測器" if self.sensors else "沒有溫度感測器")
-        parts.append(f"電池 {', '.join(self.batteries)}" if self.batteries else "沒有電池")
+        if self.batteries:
+            parts.append(f"電池 {', '.join(self.batteries)}")
+        elif self.dead_batteries:
+            parts.append(f"電池 {', '.join(self.dead_batteries)}（已經沒用了）")
+        else:
+            parts.append("沒有電池")
         if self.systemd:
             parts.append("systemd")
         if self.ssh:
@@ -38,10 +46,13 @@ def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
 
 def probe(host: Host) -> Findings:
     power = host.power()
+    batteries = power.batteries if power else []
+    ac = power.ac_online if power else None
     return Findings(
         mounts=host.mounts(),
         sensors=len(host.temperatures()),
-        batteries=[b.name for b in power.batteries] if power else [],
+        batteries=[b.name for b in batteries if not is_dead(b, ac)],
+        dead_batteries=[b.name for b in batteries if is_dead(b, ac)],
         systemd=host.has_systemd(),
         ssh=_port_open("127.0.0.1", 22),
     )
@@ -109,6 +120,16 @@ def generate_config(found: Findings, host_name: str) -> str:
         add('type = "battery"')
         add("low = 25")
         add("min_health = 50")
+    else:
+        add("")
+        if found.dead_batteries:
+            names = ", ".join(found.dead_batteries)
+            add(f"# 偵測到電池 {names}，但已經沒用了（健康度很低或充不進電），所以不加電池檢查。")
+        else:
+            add("# 沒有偵測到電池，所以不加電池檢查。")
+        add("# 停電時會直接關機；下面的「開機時間」檢查會在電來之後告訴你停了多久。")
+        add("# BIOS 裡如果有「通電自動開機」（ThinkPad 叫 Power On with AC Attach），記得打開，")
+        add("# 不然停電後要有人按電源鍵才會開機。")
     add("")
     add("# 偵測重新開機，並推算停機了多久")
     add("[[check]]")

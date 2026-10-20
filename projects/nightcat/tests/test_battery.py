@@ -90,3 +90,64 @@ def test_overall_capacity_weighs_by_energy() -> None:
     assert overall_capacity([small_full, big_empty]) == pytest.approx(28.0)
     assert overall_capacity([Battery("a", 50, "Full"), Battery("b", 70, "Full")]) == 60.0
     assert overall_capacity([]) is None
+
+
+def test_dead_battery_by_health(tree: FakeTree) -> None:
+    _thinkpad(tree, ac=True, capacity=0, health_full=720000, threshold=100)  # 健康度 3%
+    r = BatteryCheck().run(tree.ctx())
+    assert r.status is Status.WARN
+    assert "BAT0 已經沒用了（健康度 3%）" in r.summary and "直接關機" in r.summary
+    # 電池已經沒用了，就不要再叫你設定充電上限
+    assert r.hint and "Power On with AC Attach" in r.hint and "sudo tee" not in r.hint
+    assert "膨脹" in r.hint
+    assert "capacity" not in r.metrics
+
+
+def test_dead_battery_that_cannot_charge(tree: FakeTree) -> None:
+    tree.ac(True)
+    tree.battery("BAT0", status="Not charging", capacity=0)  # 沒有容量資訊，只知道充不進去
+    r = BatteryCheck().run(tree.ctx())
+    assert r.status is Status.WARN and "插著電也充不進去" in r.summary
+
+
+def test_empty_battery_that_is_charging_is_not_dead(tree: FakeTree) -> None:
+    tree.ac(True)
+    tree.battery("BAT0", status="Charging", capacity=0)
+    r = BatteryCheck().run(tree.ctx())
+    assert r.status is Status.OK and "充電中" in r.summary
+
+
+def test_x270_with_dead_internal_battery(tree: FakeTree) -> None:
+    tree.ac(True)
+    tree.battery("BAT0", status="Unknown", capacity=0, energy_full_design=23200000,
+                 energy_full=900000, energy_now=0)  # fmt: skip
+    tree.battery("BAT1", status="Full", capacity=95, energy_full_design=24000000,
+                 energy_full=20000000, energy_now=19000000)  # fmt: skip
+    r = BatteryCheck().run(tree.ctx())
+    assert r.status is Status.WARN
+    assert "BAT0 已經沒用了，停電時只剩 BAT1 撐著（電量 95%）" in r.summary
+    assert r.metrics["capacity"] == 95.0
+
+
+def test_no_battery_hint() -> None:
+    from nightcat.checks.battery import NO_BATTERY_HINT
+
+    assert "開機時間" in NO_BATTERY_HINT
+
+
+def test_init_skips_battery_check_for_dead_battery(tree: FakeTree) -> None:
+    from nightcat.config import parse_config, tomllib
+    from nightcat.probe import generate_config, probe
+
+    tree.ac(True)
+    tree.battery(
+        "BAT0", status="Not charging", capacity=0, energy_full_design=23200000, energy_full=400000
+    )
+    found = probe(tree.host())
+    assert found.batteries == [] and found.dead_batteries == ["BAT0"]
+    assert "電池 BAT0（已經沒用了）" in found.describe()
+    text = generate_config(found, "X270")
+    assert "偵測到電池 BAT0，但已經沒用了" in text and "Power On with AC Attach" in text
+    cfg = parse_config(tomllib.loads(text))
+    assert "battery" not in [c.type for c in cfg.checks]
+    assert "uptime" in [c.type for c in cfg.checks]
