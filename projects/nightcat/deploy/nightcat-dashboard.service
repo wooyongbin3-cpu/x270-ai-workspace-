@@ -1,0 +1,11 @@
+# 守夜貓儀表板（選用）：http://127.0.0.1:8077
+[Unit]
+Description=nightcat dashboard
+
+[Service]
+ExecStart=%h/.local/bin/nightcat serve
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

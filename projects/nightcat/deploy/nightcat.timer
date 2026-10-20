@@ -1,0 +1,11 @@
+[Unit]
+Description=nightcat: run every 5 minutes
+
+[Timer]
+# 開機 1 分鐘後先跑一次：這樣才抓得到「剛重新開機」和停機了多久
+OnBootSec=1min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

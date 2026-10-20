@@ -1,0 +1,15 @@
+# 守夜貓：檢查一次 + 通知。由 nightcat.timer 每 5 分鐘觸發。
+# 這是「使用者層級」的服務，放到 ~/.config/systemd/user/ 底下，不需要 root。
+[Unit]
+Description=nightcat: check the server once and notify
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# pipx 裝的話在 ~/.local/bin；用 venv 的話改成 venv 裡的路徑
+ExecStart=%h/.local/bin/nightcat run --quiet
+# Telegram token 放在這個檔案（權限 600）：NIGHTCAT_TELEGRAM_TOKEN=123456789:AA...
+EnvironmentFile=-%h/.config/nightcat/env
+Nice=10
+TimeoutStartSec=120
